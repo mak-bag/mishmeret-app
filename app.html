@@ -1,0 +1,2472 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>משמרת</title>
+<meta name="theme-color" content="#ffffff">
+<script>
+/* חייב לרוץ לפני הציור הראשון, אחרת המסך מהבהב בערכה הלא-נכונה */
+(function(){try{var t=localStorage.getItem('mishmeret-theme');
+  if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+</script>
+<link rel="icon" type="image/png" sizes="32x32" href="assets/logo-mark-32.png">
+<link rel="icon" type="image/png" sizes="96x96" href="assets/logo-mark-96.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="משמרת">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ==========================================================================
+   משמרת — מערכת עיצוב
+   כחול המותג נשמר לפעולה ולמצב בלבד. כל השאר: דיו, אפור־כחלחל, קו שערה.
+   ========================================================================== */
+:root{
+  /* מותג */
+  --brand:#1257d6;          /* הכחול מהלוגו */
+  --brand-ink:#0e46ab;      /* מצב לחיצה / hover */
+  --navy:#0f2a56;           /* הנייבי של הוורדמארק */
+
+  /* משטחים */
+  --bg:#f5f7fa; --surface:#fff; --surface-2:#eef1f7;
+  --text:#0d1b33; --muted:#5b6b85;
+  --border:#e3e8f0; --border-strong:#ccd6e6;
+
+  /* מצב */
+  --accent:var(--brand); --accent-2:var(--brand-ink); --accent-soft:#e8efff;
+  /* כחול מלא לכפתורים. נפרד מ---accent כי במצב כהה הטקסט והאייקונים
+     צריכים כחול בהיר, אבל כפתור מלא חייב כחול רווי כדי שלבן עליו ייקרא. */
+  --accent-solid:#1257d6; --accent-solid-h:#0e46ab;
+  --field:#fcfdff;
+  --green:#0d7a55; --green-soft:#e3f4ed;
+  --amber:#8d5b06; --amber-soft:#fbeed9;
+  /* ענבר = זהירות (תגיות, לוח אזהרה). אדום = הרסני (ביטול, שחרור עובד).
+     לפני ההפרדה שניהם היו ענבר, ו"ביטול השיבוץ" נראה כמו "דחוף". */
+  --danger:#b42318; --danger-soft:#fdecea;
+
+  --on-accent:#fff;
+
+  --ring:0 0 0 3px rgba(18,87,214,.20);
+  --shadow:0 1px 1px rgba(13,27,51,.04), 0 3px 8px -4px rgba(13,27,51,.12), 0 16px 32px -22px rgba(13,27,51,.45);
+  --shadow-lift:0 1px 1px rgba(13,27,51,.05), 0 6px 14px -6px rgba(13,27,51,.16), 0 26px 48px -26px rgba(13,27,51,.6);
+  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6b85' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+
+  /* כל מה שמשתנה בין הערכות יושב כאן כטוקן, ולא ככללי @media מפוזרים.
+     כך יש בלוק אחד בלבד לשכפל עבור הבחירה הידנית. */
+  --wm-filter:none;                              /* הוורדמארק בצבעי מקור */
+  --picker-filter:none;                          /* אייקון בורר התאריך של הדפדפן */
+  /* אריחי OSM בהירים תמיד. הפילטר כויל על נתניה, מפרץ חיפה ומרכז
+     תל אביב — אל תשנה בו מספר בלי לכייל מחדש מול אריחים אמיתיים.
+     חל על .leaflet-tile-pane בלבד; ב-.leaflet-container הוא היה הופך
+     גם את הסמנים, הפופאפים והעיגולים. */
+  --tiles-filter:none;
+  /* צל של סמן מעל אריחים. --shadow הוא צל של כרטיס ומרוח מדי כאן. */
+  --pin-shadow:0 2px 6px rgba(13,27,51,.32);
+  --toast-bg:var(--navy); --toast-border:transparent;
+  --auth-banner:url("assets/auth-banner.jpg");
+  --theme-t:0;   /* 0 בהיר, 1 כהה. מניע את הצלבת האייקונים במתג */
+
+  /* עקומות האטה. ease-out חד בהתחלה ומתמתן — תנועה שמרגישה
+     מגיבה ולא "מונפשת". אותה עקומה בכל המערכת. */
+  --ease:cubic-bezier(.22,1,.36,1);
+  --ease-soft:cubic-bezier(.4,0,.2,1);
+
+  --r:16px; --r-s:12px;
+}
+
+/* ============ הערכה הכהה ============
+   מוגדרת פעמיים בכוונה: פעם לפי העדפת המערכת, ופעם לבחירה ידנית
+   מפורשת. CSS לא מאפשר לאחד תנאי @media עם סלקטור רגיל.
+   >>> כל שינוי כאן חייב להיעשות בשני הבלוקים. <<< */
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --brand:#5c9bff; --brand-ink:#8ab8ff; --navy:#dbe7ff;
+    --bg:#0a1020; --surface:#111a2d; --surface-2:#1a2438;
+    --text:#e9eefb; --muted:#93a4c0;
+    --border:#27354f; --border-strong:#3a4c6b;
+    --accent-soft:#152a4f;
+    --accent-solid:#2563eb; --accent-solid-h:#1d4ed8;
+    /* השדה שקוע מתחת למשטח הלוח, אחרת הוא נבלע בו */
+    --field:#0b1322;
+    --green:#4cbf94; --green-soft:#0f2b23;
+    --amber:#dfad5f; --amber-soft:#2d2414;
+    --danger:#fa8a82; --danger-soft:#3a1614;
+    --ring:0 0 0 3px rgba(92,155,255,.26);
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 14px 34px -20px rgba(0,0,0,.9);
+    --shadow-lift:0 1px 2px rgba(0,0,0,.5), 0 24px 46px -24px rgba(0,0,0,1);
+    --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2393a4c0' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    --wm-filter:brightness(0) invert(1);
+    --picker-filter:invert(1) brightness(1.7);
+    --tiles-filter:invert(1) hue-rotate(182deg) brightness(.86) contrast(1) saturate(.78);
+    --pin-shadow:0 2px 10px rgba(0,0,0,.62);
+    --toast-bg:#1d2b46; --toast-border:#3a4c6b;
+    --auth-banner:url("assets/auth-banner-dark.jpg");
+    --theme-t:1;
+  }
+}
+:root[data-theme="dark"]{
+  --brand:#5c9bff; --brand-ink:#8ab8ff; --navy:#dbe7ff;
+  --bg:#0a1020; --surface:#111a2d; --surface-2:#1a2438;
+  --text:#e9eefb; --muted:#93a4c0;
+  --border:#27354f; --border-strong:#3a4c6b;
+  --accent-soft:#152a4f;
+  --accent-solid:#2563eb; --accent-solid-h:#1d4ed8;
+  --field:#0b1322;
+  --green:#4cbf94; --green-soft:#0f2b23;
+  --amber:#dfad5f; --amber-soft:#2d2414;
+  --danger:#fa8a82; --danger-soft:#3a1614;
+  --ring:0 0 0 3px rgba(92,155,255,.26);
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 14px 34px -20px rgba(0,0,0,.9);
+  --shadow-lift:0 1px 2px rgba(0,0,0,.5), 0 24px 46px -24px rgba(0,0,0,1);
+  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2393a4c0' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --wm-filter:brightness(0) invert(1);
+  --picker-filter:invert(1) brightness(1.7);
+  --tiles-filter:invert(1) hue-rotate(182deg) brightness(.86) contrast(1) saturate(.78);
+  --pin-shadow:0 2px 10px rgba(0,0,0,.62);
+  --toast-bg:#1d2b46; --toast-border:#3a4c6b;
+  --auth-banner:url("assets/auth-banner-dark.jpg");
+  --theme-t:1;
+}
+*{box-sizing:border-box}
+/* .btn מקבל display:inline-flex, שגובר על [hidden] של הדפדפן.
+   בלי השורה הזו כפתור היציאה והניווט התחתון לא היו נסתרים לפני כניסה. */
+[hidden]{display:none !important}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:"Heebo",-apple-system,"Segoe UI",Arial,sans-serif;
+  font-size:16px;line-height:1.55;-webkit-text-size-adjust:100%;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  font-feature-settings:"tnum" 1,"lnum" 1;
+}
+button,input,select,textarea{font-family:inherit}
+::selection{background:var(--accent-soft);color:var(--accent-2)}
+:focus-visible{outline:none}
+.wrap{max-width:720px;margin:0 auto;padding:0 16px 116px}
+html{scroll-behavior:smooth}
+
+/* ---------- תנועה ----------
+   ה-JS מצייר את #view מחדש אחרי כל פעולה, ולכן אנימציית הכניסה
+   מתנגנת שוב בכל פעם. משך קצר ומרחק קטן בכוונה: ארוך מזה מרגיש איטי,
+   לא יוקרתי. ההשהיות מדורגות רק על ששת הבלוקים הראשונים. */
+@keyframes riseIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+#view>*{animation:riseIn .26s var(--ease) both}
+#view>*:nth-child(2){animation-delay:.03s}
+#view>*:nth-child(3){animation-delay:.06s}
+#view>*:nth-child(4){animation-delay:.09s}
+#view>*:nth-child(5){animation-delay:.12s}
+#view>*:nth-child(n+6){animation-delay:.14s}
+
+/* ---------- כותרת עליונה ---------- */
+header.top{background:var(--surface);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:30}
+.top-in{max-width:720px;margin:0 auto;padding:9px 16px;display:flex;align-items:center;gap:9px}
+/* לוקאפ המותג: הנכסים המקוריים מגיליון המותג */
+.logo{display:flex;align-items:center;gap:9px;min-width:0}
+.logo .dot{width:30px;height:30px;flex:none;display:block}
+/* על רקע כהה הטוקן הופך את הוורדמארק ל-knockout לבן, כמקובל בספר מותג */
+.logo .wordmark{height:21px;width:auto;display:block;filter:var(--wm-filter)}
+.spacer{flex:1}
+
+/* ---------- מתג ערכה ---------- */
+#themeBtn{flex:none;width:34px;height:34px;padding:0;border-radius:50%;cursor:pointer;
+  display:grid;place-items:center;background:var(--surface-2);
+  border:1px solid var(--border);color:var(--muted);
+  transition:background .15s,color .15s,border-color .15s}
+#themeBtn:hover{background:var(--border);color:var(--text);border-color:var(--border-strong)}
+#themeBtn:focus-visible{box-shadow:var(--ring)}
+#themeBtn svg{width:18px;height:18px;display:block}
+/* שני האייקונים מוערמים באותה משבצת ומצליבים בסיבוב, במקום לקפוץ.
+   --theme-t הוא 0 או 1, ולכן אותו טוקן מניע גם את השקיפות וגם את הזווית. */
+#themeBtn svg{grid-area:1/1;
+  transition:opacity .22s var(--ease-soft),transform .34s var(--ease)}
+#themeBtn .sun{opacity:var(--theme-t);
+  transform:rotate(calc((1 - var(--theme-t)) * -80deg)) scale(calc(.6 + var(--theme-t) * .4))}
+#themeBtn .moon{opacity:calc(1 - var(--theme-t));
+  transform:rotate(calc(var(--theme-t) * 80deg)) scale(calc(1 - var(--theme-t) * .4))}
+/* מעל הבאנר: זכוכית שקופה, כדי שייקרא גם על הגל הכחול וגם על הכהה */
+body:has(#authForm) #themeBtn{
+  background:rgba(125,140,170,.28);border-color:rgba(255,255,255,.35);color:#fff;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+body:has(#authForm) #themeBtn:hover{background:rgba(125,140,170,.45)}
+/* שם המשתמש לא דוחף את הלוקאפ החוצה במסכים צרים */
+#who{max-width:34vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- מסך הכניסה: רגע המותג ----------
+   הבאנר והמרכוז נוספים ב-CSS בלבד דרך :has() — ה-JS לא נגע.
+   הכותרת יורדת לשכבה שקופה מעל הבאנר — הלוקאפ כבר בתוכו, אבל מתג
+   הערכה חייב להישאר נגיש, ולכן היא לא מוסתרת לגמרי.
+   הדהייה לתחתית נעשית ב-mask ולא באלפא של הקובץ, כדי שהוא יישאר JPEG קל. */
+body:has(#authForm) header.top{
+  position:absolute;inset-inline:0;top:0;background:transparent;border-bottom:0}
+body:has(#authForm) .logo{display:none}
+#view:has(#authForm){text-align:center}
+#view:has(#authForm)::before{
+  content:"";display:block;width:calc(100% + 32px);aspect-ratio:941/640;
+  /* שוליים תחתונים שליליים: התוכן נכנס לתוך אזור הדהייה במקום
+     להיערם אחריו, אחרת נוצר חלל מת של כ-100px מתחת ללוגו */
+  margin:0 -16px -46px;
+  background:var(--auth-banner) center top/cover no-repeat;
+  -webkit-mask-image:linear-gradient(to bottom,#000 56%,transparent 96%);
+          mask-image:linear-gradient(to bottom,#000 56%,transparent 96%)}
+#view:has(#authForm) h1{margin-top:0}
+#view:has(#authForm) .sub{margin-inline:auto}
+#view:has(#authForm) .panel{text-align:start}
+/* מעל רוחב הטלפון היחס 941/640 נותן באנר של ~510px שמשתלט על המסך.
+   יחס שטוח יותר + מיקום 40% שומר את הלוקאפ במרכז החיתוך. */
+@media (min-width:700px){
+  #view:has(#authForm)::before{
+    /* 28% ולא 50%: הלוקאפ יושב ב-40% מגובה המקור, ולכן מרכוז החלון
+       דורש הסטה למעלה. בלי זה הוא נצמד לקצה העליון. */
+    aspect-ratio:941/360;background-position:center 28%;margin-bottom:-34px}
+}
+
+/* ---------- טיפוגרפיה ---------- */
+h1{font-size:25px;font-weight:800;margin:26px 0 5px;letter-spacing:-.9px;line-height:1.25}
+h2{font-size:15px;font-weight:800;margin:28px 0 2px;letter-spacing:-.2px;color:var(--text)}
+h2::before{content:"";display:inline-block;width:13px;height:2px;border-radius:2px;
+  background:var(--brand);vertical-align:middle;margin-inline-end:9px;transform:translateY(-2px)}
+.sub{color:var(--muted);font-size:14.5px;margin-bottom:16px;max-width:52ch}
+
+/* ---------- לוחות וטפסים ---------- */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:18px;box-shadow:var(--shadow);margin-top:14px}
+.panel.warn{border-color:var(--border-strong);position:relative;overflow:hidden}
+.panel.warn::before{content:"";position:absolute;inset-block:0;inset-inline-start:0;width:3px;background:var(--amber)}
+label{display:block;font-size:12.5px;font-weight:700;margin:14px 0 6px;color:var(--muted);letter-spacing:-.1px}
+input,select,textarea{width:100%;font-size:16px;color:var(--text);background:var(--field);
+  border:1px solid var(--border-strong);border-radius:var(--r-s);padding:12.5px 14px;
+  transition:border-color .18s var(--ease-soft),box-shadow .18s var(--ease-soft),background .18s}
+input::placeholder,textarea::placeholder{color:var(--muted);opacity:.62}
+textarea{min-height:92px;resize:vertical;line-height:1.55}
+/* הרשימה הנפתחת עצמה היא של מערכת ההפעלה ואי אפשר לעצב אותה.
+   בנייד זו דווקא ההתנהגות הנכונה (גלגלת iOS / דיאלוג אנדרואיד),
+   ולכן מושקע כאן המצב הסגור: יעד גדול, חץ מיושר, מעבר רך. */
+select{appearance:none;-webkit-appearance:none;cursor:pointer;
+  background-image:var(--chev);background-repeat:no-repeat;
+  background-position:left 13px center;background-size:17px;padding-inline-start:40px}
+input:hover,select:hover,textarea:hover{border-color:var(--muted)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:var(--ring)}
+/* בורר התאריך/שעה של הדפדפן — האייקון שלו מיושר ומקבל את צבע הממשק */
+input[type=date]::-webkit-calendar-picker-indicator,
+input[type=time]::-webkit-calendar-picker-indicator{
+  cursor:pointer;opacity:.55;transition:opacity .15s;
+  filter:var(--picker-filter)}
+input[type=date]:hover::-webkit-calendar-picker-indicator,
+input[type=time]:hover::-webkit-calendar-picker-indicator{opacity:.9}
+.two{display:flex;gap:10px}
+.two>div{flex:1}
+
+/* ---------- טווח הנסיעה ----------
+   --fill מתעדכן מסקריפט הליטוש. CSS לבדו לא יודע לצבוע את הקטע
+   שכבר נבחר, והפס בלי מילוי לא מראה למשתמש איפה הוא עומד.
+   ב-RTL המינימום נמצא מימין, ולכן המילוי הולך "to left". */
+input[type=range]{-webkit-appearance:none;appearance:none;background:none;border:0;
+  padding:0;height:26px;box-shadow:none;cursor:pointer;--fill:0%}
+input[type=range]:hover,input[type=range]:focus{border:0;box-shadow:none}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:99px;
+  background:linear-gradient(to left,var(--accent-solid) var(--fill),var(--surface-2) var(--fill));
+  border:1px solid var(--border)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-9px;
+  border-radius:50%;background:var(--surface);border:3px solid var(--accent-solid);
+  box-shadow:0 1px 3px rgba(13,27,51,.3);
+  transition:transform .16s var(--ease),box-shadow .16s var(--ease)}
+input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.08)}
+input[type=range]:active::-webkit-slider-thumb{transform:scale(1.16);box-shadow:0 2px 8px rgba(13,27,51,.35)}
+input[type=range]::-moz-range-track{height:6px;border-radius:99px;
+  background:linear-gradient(to left,var(--accent-solid) var(--fill),var(--surface-2) var(--fill));
+  border:1px solid var(--border)}
+input[type=range]::-moz-range-thumb{width:19px;height:19px;border-radius:50%;background:var(--surface);
+  border:3px solid var(--accent-solid);box-shadow:0 1px 3px rgba(13,27,51,.3)}
+input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:var(--ring)}
+
+/* ---------- כפתורים ---------- */
+.btn{font-weight:700;font-size:15.5px;letter-spacing:-.25px;border-radius:var(--r-s);
+  padding:13.5px 20px;border:1px solid var(--accent-solid);background:var(--accent-solid);color:var(--on-accent);
+  cursor:pointer;width:100%;margin-top:18px;text-decoration:none;text-align:center;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  -webkit-tap-highlight-color:transparent;
+  box-shadow:0 1px 2px rgba(18,87,214,.22);
+  transition:background .18s var(--ease-soft),border-color .18s var(--ease-soft),
+             transform .12s var(--ease),box-shadow .18s var(--ease-soft)}
+.btn:hover{background:var(--accent-solid-h);border-color:var(--accent-solid-h)}
+/* לחיצה: התכווצות קלה במקום הזזה. זה מה שנותן תחושת "נלחץ" אמיתית */
+.btn:active{transform:scale(.978);box-shadow:none;transition-duration:.05s}
+.btn:focus-visible{box-shadow:var(--ring)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+.btn.ghost{background:transparent;color:var(--text);border-color:var(--border-strong);
+  width:auto;padding:8px 14px;font-size:14px;margin:0;box-shadow:none}
+.btn.ghost:hover{background:var(--surface-2);border-color:var(--muted);color:var(--text)}
+.btn.soft{background:var(--surface-2);color:var(--text);border-color:var(--border-strong);box-shadow:none}
+.btn.soft:hover{background:var(--border);border-color:var(--muted)}
+.btn.danger{background:transparent;color:var(--danger);border-color:var(--danger);box-shadow:none}
+.btn.danger:hover{background:var(--danger-soft);border-color:var(--danger);color:var(--danger)}
+.link{background:none;border:0;color:var(--accent);font-weight:700;cursor:pointer;
+  font-size:14.5px;padding:8px;border-radius:8px}
+.link:hover{color:var(--accent-2);text-decoration:underline;text-underline-offset:3px}
+.link:focus-visible{box-shadow:var(--ring)}
+.back{background:none;border:0;color:var(--muted);font-weight:700;font-size:14px;
+  padding:16px 0 0;cursor:pointer;border-radius:6px}
+.back:hover{color:var(--text)}
+
+.err{background:var(--amber-soft);color:var(--amber);border-radius:var(--r-s);
+  padding:11px 13px;font-size:14px;margin-top:14px;font-weight:600;
+  border:1px solid color-mix(in srgb,var(--amber) 22%,transparent)}
+.note{font-size:12.5px;color:var(--muted);margin-top:12px;line-height:1.75}
+
+.bar{display:flex;gap:10px;align-items:center;margin:18px 0 4px;flex-wrap:wrap}
+.bar .grow{flex:1;min-width:150px}
+.bar label{margin:0 0 6px}
+
+/* ---------- שורת בחירה ----------
+   הייתה שורה עם קו מפריד; עכשיו יעד בחירה בפני עצמו שמשנה מצב כשנבחר.
+   שטח הלחיצה גדל מ-21px של התיבה לכל רוחב השורה. */
+.check{display:flex;gap:12px;align-items:flex-start;padding:14px 15px;margin-top:10px;
+  border:1px solid var(--border);border-radius:var(--r-s);background:var(--surface);
+  cursor:pointer;-webkit-tap-highlight-color:transparent;
+  transition:border-color .18s var(--ease-soft),background .18s var(--ease-soft)}
+.check:hover{border-color:var(--border-strong)}
+.check:has(:checked){border-color:var(--accent);background:var(--accent-soft)}
+.check:active{transform:scale(.995)}
+
+/* תיבת סימון מותאמת. accent-color נותן את תיבת המערכת, שנראית שונה
+   בכל פלטפורמה ולא מתיישרת עם הרדיוסים שלנו. */
+.check input[type=checkbox]{
+  appearance:none;-webkit-appearance:none;position:relative;
+  width:22px;height:22px;flex:none;margin:0;padding:0;
+  border:2px solid var(--border-strong);border-radius:7px;
+  background:var(--field);cursor:pointer;box-shadow:none;
+  transition:background .18s var(--ease),border-color .18s var(--ease),box-shadow .15s}
+.check input[type=checkbox]:hover{border-color:var(--muted)}
+.check input[type=checkbox]:checked{background:var(--accent-solid);border-color:var(--accent-solid)}
+.check input[type=checkbox]:focus-visible{box-shadow:var(--ring)}
+/* הסימן עצמו. מיקום פיזי ולא לוגי — הוא סימטרי ואסור שיתהפך ב-RTL. */
+.check input[type=checkbox]::after{
+  content:"";position:absolute;left:6px;top:2px;width:5px;height:10px;
+  border:solid #fff;border-width:0 2.2px 2.2px 0;
+  transform:rotate(45deg) scale(.5);opacity:0;
+  transition:transform .2s var(--ease),opacity .12s linear}
+.check input[type=checkbox]:checked::after{transform:rotate(45deg) scale(1);opacity:1}
+
+.check .t{font-weight:700;font-size:14.5px;display:flex;align-items:center;gap:7px}
+.check .d{font-size:12.5px;color:var(--muted);line-height:1.55;display:block;margin-top:3px}
+
+/* ---------- כרטיסים ---------- */
+.list{display:flex;flex-direction:column;gap:11px;margin-top:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:17px 18px;box-shadow:var(--shadow);position:relative;
+  transition:box-shadow .18s cubic-bezier(.2,.8,.3,1),border-color .18s,transform .18s cubic-bezier(.2,.8,.3,1)}
+/* משמרת דחופה: פס מותג בקצה המוביל, כגבול אמיתי כדי שיישב בתוך העיגול */
+.card.urgent{border-inline-start:3px solid var(--brand);padding-inline-start:16px}
+.card.tap{cursor:pointer}
+.card.tap:hover{border-color:var(--border-strong);box-shadow:var(--shadow-lift);transform:translateY(-2px)}
+.card.tap:active{transform:translateY(0);box-shadow:var(--shadow);transition-duration:.06s}
+.card.dim{opacity:.55;box-shadow:none}
+.card.dim.urgent{border-inline-start-color:var(--border-strong)}
+.card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.card-head>div:first-child{min-width:0}
+.role{font-size:17.5px;font-weight:800;letter-spacing:-.5px;line-height:1.3}
+.biz{color:var(--muted);font-size:13.5px;margin-top:3px}
+/* המחיר לעולם לא נשבר לשתי שורות */
+.pay{text-align:end;flex:none}
+.pay .rate{font-size:22px;font-weight:800;color:var(--navy);white-space:nowrap;letter-spacing:-.7px}
+/* הסכום הוא הגיבור; סימן המטבע קטן ושקט לידו, כמו בתפריטים מודפסים */
+.rate .cur{font-size:.6em;font-weight:700;color:var(--muted);
+  letter-spacing:0;margin-inline-end:1px;vertical-align:.09em}
+.pay .per{font-size:11.5px;color:var(--muted);display:block;text-align:end;
+  margin-top:1px;white-space:nowrap}
+
+/* ---------- אייקונים ----------
+   mask על currentColor: כל אייקון יורש את צבע ההקשר שלו, כך שתגית
+   ירוקה מקבלת אייקון ירוק בלי כפילות הגדרות. החליף את האמוג'ים, שרונדרו
+   שונה בכל מערכת הפעלה ולא היו ניתנים לצביעה או ליישור. */
+.icon{display:inline-block;width:1.05em;height:1.05em;flex:none;
+  vertical-align:-.16em;background-color:currentColor;
+  -webkit-mask:var(--gl) center/contain no-repeat;
+          mask:var(--gl) center/contain no-repeat}
+.icon-bolt{--gl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'%3E%3Cpath d='M13.2 2 4.6 13.1a.6.6 0 0 0 .5 1h4.6l-.9 7.9a.6.6 0 0 0 1.1.4l8.6-11.1a.6.6 0 0 0-.5-1h-4.6l.9-7.9a.6.6 0 0 0-1.1-.4z'/%3E%3C/svg%3E")}
+.icon-van{--gl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.8 15.8V8.2a1.5 1.5 0 0 1 1.5-1.5h8.4v9.1M12.7 10.1h3.6l3 3.5v2.2M2.8 15.8h1.6M9.2 15.8h4M18.7 15.8h1.7'/%3E%3Ccircle cx='6.6' cy='16.4' r='2'/%3E%3Ccircle cx='16.3' cy='16.4' r='2'/%3E%3C/svg%3E")}
+.icon-pin{--gl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 21.3c4.2-4.3 6.3-7.7 6.3-10.4a6.3 6.3 0 1 0-12.6 0c0 2.7 2.1 6.1 6.3 10.4z'/%3E%3Ccircle cx='12' cy='10.6' r='2.4'/%3E%3C/svg%3E")}
+.icon-phone{--gl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6.6 3.4h3.1l1.3 3.7-1.9 1.4a12.3 12.3 0 0 0 5.4 5.4l1.4-1.9 3.7 1.3v3.1a1.9 1.9 0 0 1-2.1 1.9A15.8 15.8 0 0 1 4.7 5.5a1.9 1.9 0 0 1 1.9-2.1z'/%3E%3C/svg%3E")}
+.icon-nav{--gl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23000'%3E%3Cpath d='M20.8 3.2 3.6 10.6a.5.5 0 0 0 .1 1l7 2.2 2.2 7a.5.5 0 0 0 1 .1z'/%3E%3C/svg%3E")}
+.icon-chat{--gl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.6 11.5a7.9 7.9 0 0 1-11.6 7L3.4 20.6l2.1-5.6a7.9 7.9 0 1 1 15.1-3.5z'/%3E%3C/svg%3E")}
+.icon-plus{--gl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.1' stroke-linecap='round'%3E%3Cpath d='M12 5.2v13.6M5.2 12h13.6'/%3E%3C/svg%3E")}
+.icon-users{--gl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 20.2v-1.9a3.8 3.8 0 0 0-3.8-3.8H6.5a3.8 3.8 0 0 0-3.8 3.8v1.9M21.3 20.2v-1.9a3.8 3.8 0 0 0-2.8-3.7M16.6 3.9a3.8 3.8 0 0 1 0 7.2'/%3E%3Ccircle cx='9.4' cy='7.4' r='3.7'/%3E%3C/svg%3E")}
+.icon-calendar{--gl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.4' y='5' width='17.2' height='15.6' rx='3'/%3E%3Cpath d='M8 2.9v4.2M16 2.9v4.2M3.4 10.3h17.2'/%3E%3C/svg%3E")}
+.icon-calendar-plus{--gl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.4' y='5' width='17.2' height='15.6' rx='3'/%3E%3Cpath d='M8 2.9v4.2M16 2.9v4.2M3.4 10.3h17.2M12 13.2v4.4M9.8 15.4h4.4'/%3E%3C/svg%3E")}
+.icon-clock{--gl:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='8.6'/%3E%3Cpath d='M12 7v5.2l3.4 2'/%3E%3C/svg%3E")}
+
+/* ---------- תגיות ---------- */
+.meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.tag{display:inline-flex;align-items:center;gap:5px;
+  font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;
+  background:var(--surface-2);color:var(--muted);
+  border:1px solid transparent;white-space:nowrap}
+.tag.today,.tag.need{background:var(--accent-soft);color:var(--accent-2);font-weight:700;
+  border-color:color-mix(in srgb,var(--brand) 20%,transparent)}
+.tag.hot{background:var(--amber-soft);color:var(--amber);font-weight:700;
+  border-color:color-mix(in srgb,var(--amber) 22%,transparent)}
+.tag.instant,.tag.done{background:var(--green-soft);color:var(--green);font-weight:700;
+  border-color:color-mix(in srgb,var(--green) 20%,transparent)}
+
+.desc{margin-top:11px;font-size:14px;color:var(--muted);white-space:pre-line;line-height:1.6}
+.card-foot{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.card-foot .btn{width:auto;margin:0;padding:10px 17px;font-size:14.5px}
+.state{font-size:13.5px;font-weight:700;color:var(--green)}
+.who-row{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.who-name{font-size:15.5px;font-weight:700;letter-spacing:-.3px}
+.who-sub{font-size:13px;color:var(--muted)}
+.hint{font-size:13px;color:var(--muted);background:var(--surface-2);
+  border-radius:var(--r-s);padding:9px 12px;margin-top:12px;line-height:1.7}
+/* בלי הקו התחתון הכחול של הדפדפן — הקישורים כאן הם פעולות, לא הפניות */
+.hint a{color:var(--accent);text-decoration:none;font-weight:700;white-space:nowrap}
+.hint a:hover{color:var(--accent-2);text-decoration:underline;text-underline-offset:3px}
+/* בלי מסגרת וצל: תיבה ריקה בתוך תיבה נראית כמו תקלה, לא כמו מצב */
+.empty{text-align:center;padding:52px 24px;color:var(--muted);
+  background:none;border:0;border-radius:var(--r);font-size:14.5px;line-height:1.7}
+.empty .big{display:block;width:36px;height:36px;margin:0 auto 14px;opacity:.38}
+
+/* ---------- ניווט תחתון ---------- */
+/* מתג מצב, לא לשוניות. המשתמש צריך לדעת בלי לחשוב באיזה צד הוא
+   נמצא, ולכן הצד הפעיל צבוע מלא ולא רק מסומן. */
+nav.tabs{position:fixed;bottom:0;inset-inline:0;background:var(--surface);
+  border-top:1px solid var(--border);z-index:40;
+  padding:8px 12px calc(8px + env(safe-area-inset-bottom))}
+.tabs-in{max-width:720px;margin:0 auto;display:flex;gap:6px;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:4px}
+.tab{flex:1;background:none;border:0;border-radius:11px;
+  padding:11px 8px;color:var(--muted);font-weight:700;font-size:14px;
+  letter-spacing:-.2px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  transition:background .15s,color .15s}
+.tab .ic{width:20px;height:20px;display:block;line-height:0;flex:none}
+.tab:hover{color:var(--text)}
+/* --accent-solid ולא --accent: במצב כהה --accent הוא תכלת, ולבן עליו
+   יורד ל-2.77:1. אותו מלכוד שתוקן בכפתורים. */
+.tab.on{background:var(--accent-solid);color:var(--on-accent);
+  box-shadow:0 1px 2px rgba(18,87,214,.22)}
+
+.toast{position:fixed;bottom:88px;inset-inline:16px;max-width:400px;margin:0 auto;
+  background:var(--toast-bg);border:1px solid var(--toast-border);
+  color:#fff;padding:12px 18px;border-radius:12px;
+  font-weight:700;font-size:14.5px;text-align:center;z-index:60;
+  box-shadow:0 12px 32px -10px rgba(13,27,51,.6);
+  opacity:0;transform:translateY(10px) scale(.98);transition:.2s cubic-bezier(.2,.8,.3,1);pointer-events:none}
+.toast.on{opacity:1;transform:none}
+.toast:has(.toast-act){pointer-events:auto}
+.toast-act{margin-inline-start:14px;background:none;border:0;color:#fff;font-weight:900;
+  font-size:14.5px;text-decoration:underline;text-underline-offset:3px;cursor:pointer;padding:2px 4px}
+/* ==========================================================================
+   M5 — שכבת המפה · בלוק זמני שכתב המפתח, לא המעצב
+   ‼ המעצב מחליף את כל הבלוק הזה לפי DESIGN-BRIEF של סבב M.
+   כאן יש גיאומטריה בלבד, מטוקנים קיימים. אין כאן צבע חדש, אין פילטר
+   לאריחי OSM במצב כהה (§3.2 בבריף), ואין מצבי hover/drag. אל תאשר
+   את הבלוק הזה עיצובית — הוא קיים רק כדי שאפשר יהיה לבדוק התנהגות.
+
+   שורה אחת כאן היא מבנית ולא קוסמטית ואסור שתיפול בהחלפה:
+   .map{position:relative;z-index:0} — Leaflet נותנת לשכבות הפנימיות
+   שלה z-index 400–700. בלי הקשר ערימה משלו, הן מצוירות מעל הכותרת
+   הדביקה (30) ומעל הניווט התחתון (40), והמפה מכסה את מתג המצב.
+   ========================================================================== */
+.map{position:relative;z-index:0;isolation:isolate;
+  height:min(62vh,560px);min-height:320px;margin-top:14px;
+  border:1px solid var(--border);border-radius:var(--r);overflow:hidden;
+  background:var(--surface-2)}
+.map-pick{height:280px;min-height:280px}
+
+/* ‼ כל כלל שמכוון למחלקה של Leaflet מקודד תחת .map בכוונה.
+   גיליון הסגנון של Leaflet נטען דינמית מה-CDN ונדחף לסוף ה-head —
+   כלומר אחרי הבלוק הזה. בסגוליות שווה המאוחר מנצח, ולכן הכללים
+   שלנו נדרסו בשקט: נמדד שה-tooltip נשאר rgb(255,255,255) על
+   rgb(34,34,34) למרות שעיצבנו אותו. .map מעלה את הסגוליות ל-0,2,0
+   ומנצח בלי תלות בסדר הטעינה ובלי !important.
+   אל תוריד את התחילית הזו מאף כלל leaflet-* כאן.
+
+   D12 — רווח מול חיבור בלי רווח, וזה ההבדל בין עובד ללא עובד:
+   `.map X` הוא (0,2,0). אם ל-Leaflet יש `.leaflet-container X` — גם
+   הוא (0,2,0), וזה תיקו שהם מנצחים בו כי הגיליון שלהם מאוחר יותר.
+   .map ו-.leaflet-container הם אותו אלמנט, ולכן במקרה כזה מחברים
+   בלי רווח: `.map.leaflet-container X` = (0,3,0). נסרקו כל הדריסות
+   כאן מול leaflet.css 1.9.4 — attribution היה התיקו האמיתי היחיד. */
+.map.leaflet-container{font-family:inherit;font-size:14px;background:var(--surface-2)}
+/* רק שכבת האריחים. הסמנים, הפופאפים, העיגולים והתוויות יושבים
+   בשכבות אחרות ונשארים בצבעי המותג. */
+.map .leaflet-tile-pane{filter:var(--tiles-filter)}
+
+/* סמן משמרת: גלולה עם התעריף, או עם מספר המשמרות באותה נקודה.
+   --accent-solid ולא --accent — לבן על תכלת יורד מתחת ליחס הניגודיות. */
+.pin-shift{display:inline-flex;align-items:center;justify-content:center;
+  min-width:46px;height:32px;padding:0 10px;border-radius:999px;
+  background:var(--accent-solid);color:var(--on-accent);
+  font-weight:800;font-size:13px;letter-spacing:-.3px;white-space:nowrap;
+  border:2px solid var(--surface);box-shadow:var(--pin-shadow);
+  transition:transform .14s var(--ease-soft)}
+/* על מפה צפופה, בלי זה לא רואים איזה סמן נפתח — ובמגע אין hover בכלל */
+.pin-shift.is-open{transform:translateY(-3px) scale(1.08);z-index:1000}
+.pin-shift.many{min-width:38px;font-size:14.5px}
+/* עסק בלי located_at יושב במרכז העיר. סיכה שנראית ודאית במקום שאינו
+   ודאי היא הבטחה שקרית לעובד שנוסע — ולכן מקווקוות ועמומה. */
+.pin-shift.approx{border-style:dashed;opacity:.8}
+.pin-city{display:block;width:18px;height:18px;border-radius:50%;box-sizing:border-box;
+  background:none;border:2px dashed var(--muted);opacity:.85}
+.pin-pick{display:block;width:22px;height:22px;border-radius:50%;box-sizing:border-box;
+  border:3px dashed var(--muted);background:var(--surface);opacity:.7}
+.pin-pick.on{border:3px solid var(--accent-solid);background:var(--accent-solid);
+  opacity:1;box-shadow:var(--shadow-lift)}
+
+/* עיגולי Leaflet הם path ב-SVG. Leaflet כותבת stroke/fill כמאפייני
+   מצגת, ומאפיין CSS גובר עליהם — ולכן הצבע נשלט מכאן ולא מה-JS. */
+.radius-ring{stroke:var(--accent);stroke-width:1.5;stroke-dasharray:6 6;
+  fill:var(--accent);fill-opacity:.07}
+.radius-ring.bound{stroke:var(--muted);fill:var(--muted);fill-opacity:.05}
+
+/* ‼ M12 — ערכי פתיחה מה-Tech Lead, ממתינים לכיול של המעצב בעיניים
+   בשני המצבים, כולל החץ. בלי הכלל הזה Leaflet מרנדרת לוחית לבנה
+   (rgb(255,255,255) על rgb(34,34,34)) שבוהקת על מפה כהה.
+   הכלל גורף בכוונה: הוא מכסה גם כל תווית עתידית. */
+/* --border-strong ולא --border: מעל אריחים הקצה החלש נבלע. הבועה
+   צריכה גבול שמפריד אותה מהמפה, לא גבול שמפריד אותה מכרטיס. */
+.map .leaflet-tooltip{background:var(--surface);color:var(--text);
+  border:1px solid var(--border-strong);border-radius:8px;box-shadow:var(--pin-shadow);
+  font-size:12px;font-weight:600;padding:4px 9px;white-space:nowrap}
+/* החץ הוא משולש מלא, לא מסגרת — הוא חייב את צבע המילוי של הבועה,
+   אחרת הוא נקרא כמשולש כהה מנותק. ארבעת הכיוונים, כי Leaflet בוחרת
+   כיוון לפי מקום פנוי ולא לפי מה שביקשנו. */
+.map .leaflet-tooltip-top::before{border-top-color:var(--surface)}
+.map .leaflet-tooltip-bottom::before{border-bottom-color:var(--surface)}
+.map .leaflet-tooltip-left::before{border-left-color:var(--surface)}
+.map .leaflet-tooltip-right::before{border-right-color:var(--surface)}
+/* מרכז העיר הוא נקודת ייחוס, לא יעד. אסור לו להתחרות בסמני המשמרות. */
+.map.leaflet-container .leaflet-tooltip.tip-muted{color:var(--muted)}
+
+.map .leaflet-popup-content-wrapper{background:var(--surface);color:var(--text);
+  border:1px solid var(--border-strong);border-radius:var(--r-s);box-shadow:var(--shadow-lift)}
+.map .leaflet-popup-content{margin:13px 15px;font-size:14px;line-height:1.5}
+.map .leaflet-popup-tip{background:var(--surface);border:1px solid var(--border-strong);box-shadow:none}
+/* Leaflet עצמה משתמשת ב-.leaflet-container a.leaflet-popup-close-button
+   (0,2,1). צריך סגוליות גבוהה ממנה, לא שווה לה. */
+.map.leaflet-container a.leaflet-popup-close-button{color:var(--muted);width:28px;height:28px;
+  padding:6px 7px 0 0;font-weight:700}
+.map.leaflet-container a.leaflet-popup-close-button:hover{color:var(--text);background:none}
+.pop-name{font-weight:800;font-size:15.5px;letter-spacing:-.3px}
+.pop-sub{color:var(--muted);font-size:13px;margin-top:2px}
+.pop-count{font-weight:700;font-size:12.5px;color:var(--muted);margin-top:11px}
+.pop-list{max-height:198px;overflow:auto}
+.pop-row{display:flex;gap:10px;align-items:center;justify-content:space-between;
+  padding:9px 0;border-top:1px solid var(--border)}
+.pop-role{font-weight:700;font-size:14px}
+.pop-when{color:var(--muted);font-size:12.5px}
+.pop-row .btn{width:auto;margin:0;padding:8px 13px;font-size:13.5px;flex:none}
+
+.map .leaflet-control-zoom a{background:var(--surface);color:var(--text);border-color:var(--border)}
+.map .leaflet-control-zoom a:hover{background:var(--surface-2);color:var(--text)}
+/* ה-attribution של OSM הוא תנאי רישוי. מותר להחליש, אסור להסתיר.
+   ל-Leaflet יש כאן .leaflet-container .leaflet-control-attribution — גם
+   (0,2,0). .map ו-.leaflet-container הם אותו אלמנט, ולכן תחילית עם רווח
+   נותנת תיקו בלבד, וגיליון Leaflet נטען אחרינו ומנצח. חיבור בלי רווח
+   מעלה ל-(0,3,0). נמדד: עם רווח rgba(255,255,255,.8), בלי רווח כהה. */
+.map.leaflet-container .leaflet-control-attribution{
+  background:color-mix(in srgb,var(--surface) 84%,transparent);
+  color:var(--muted);font-size:10.5px}
+.map.leaflet-container .leaflet-control-attribution a{color:var(--muted)}
+
+/* ==========================================================================
+   N2 — חלופה ג · הבלוק של המעצב. מחליף את הבלוק הזמני של המפתח.
+   אין כאן hex מקומי ואין שם מחלקה שאינו ב-§2.
+   הגיאומטריה זהה למוקאפ M19 שאושר; מה שנוסף כאן הוא .c-act
+   ושתי התאמות שבלעדיהן הפריסה נשברת — מפורטות ב-DESIGN-NOTE-N2.md.
+   ========================================================================== */
+.list-c{margin-top:14px}
+.c-head{position:sticky;top:0;z-index:5;background:var(--bg);
+  display:flex;align-items:baseline;gap:9px;padding:14px 2px 7px}
+.c-head .h{font-size:14.5px;font-weight:900;letter-spacing:-.4px}
+.c-head .n{font-size:12px;color:var(--muted);font-weight:600}
+.c-head .line{flex:1;height:1px;background:var(--border)}
+
+.c-item{display:grid;grid-template-columns:58px minmax(0,1fr) auto;gap:0 12px;
+  align-items:center;padding:10px 12px;margin-top:7px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r-s)}
+.c-item.urgent{border-inline-start:3px solid var(--brand);padding-inline-start:9px}
+.c-item.dim{opacity:.55}
+.c-item.dim.urgent{border-inline-start-color:var(--border-strong)}
+
+.c-time{font-size:15.5px;font-weight:800;letter-spacing:-.5px;line-height:1.2;display:block}
+.c-len{font-size:11px;color:var(--muted);display:block}
+.c-mid{min-width:0}
+.c-role{font-size:14.5px;font-weight:700;letter-spacing:-.3px;line-height:1.35;
+  display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.c-role .icon-bolt{color:var(--green)}
+.c-sub{font-size:12.5px;color:var(--muted);line-height:1.4;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c-sub .vr{color:var(--green);font-weight:700}
+/* gap דו-ערכי: 11px בין דגלים, 3px בין שורות כשהקו נשבר. אין מפרידי
+   נקודה — כשהקו נשבר המפריד נוחת בתחילת השורה ונראה כמו תקלה. */
+.c-flags{font-size:11.5px;color:var(--muted);display:flex;gap:3px 11px;flex-wrap:wrap;
+  align-items:center;margin-top:1px;line-height:1.45}
+.c-flags .hot{color:var(--amber);font-weight:700}
+.c-flags .need{color:var(--accent-2);font-weight:700}
+
+.c-end{text-align:end;flex:none;max-inline-size:112px}
+.c-total{font-size:17px;font-weight:800;color:var(--navy);letter-spacing:-.6px;
+  white-space:nowrap;display:block}
+/* הסכום הוא הגיבור; סימן המטבע קטן ושקט לידו, כמו בתפריטים מודפסים */
+.c-total .cur{font-size:.6em;font-weight:700;color:var(--muted);margin-inline-end:1px}
+.c-rate{font-size:11px;color:var(--muted);white-space:nowrap;display:block}
+
+/* ---------- .c-act ----------
+   הכפתור נושא גם .btn, ולכן כאן יש רק את ההפרש: .btn נותן רוחב מלא,
+   margin-top:18px ופדינג של כפתור ראשי — שלושתם הורסים שורה צפופה.
+   מה ש-.btn כן נותן ונשמר בכוונה: הצבעים, טבעת המיקוד, ההתכווצות
+   בלחיצה וביטול הדגשת המגע. כפתור שמתנהג אחרת מכל כפתור אחר בקובץ
+   הוא בדיוק מה שגורם למוצר להרגיש מורכב משניים. */
+.c-act{inline-size:auto;margin:0;padding:0 14px;min-block-size:44px;
+  font-size:13.5px;border-radius:10px;box-shadow:none;white-space:nowrap}
+/* רוחב קבוע ולא auto: עם auto, שורה בלי כפתור מאבדת את הרצועה והסכום
+   שלה קופץ 164px ביחס לשורה עם כפתור — באותו דלי, זו ליד זו. נמדד. */
+/* 152px: המחרוזת הארוכה מבין השתיים ("תפיסת המשמרת" עם האייקון)
+   נמדדה 143px. מחרוזת ארוכה מזו תדרוש מספר חדש כאן — תגיד לי. */
+.c-item.has-act{grid-template-columns:58px minmax(0,1fr) auto 152px}
+.c-item.has-act .c-act{inline-size:100%}
+
+/* ---------- 420px ומטה ----------
+   ארבע עמודות בשורה אחת לא עובדות: ב-375px העמודה האמצעית יורדת
+   מ-192px ל-28px ושלוש שורות נחתכות. הכפתור יורד לשורה שנייה
+   ורוחבי העמודות נשמרים. הסף 420 ולא 380: גם ב-414px ארבע עמודות משאירות לאמצע 68px
+   ושלוש שורות נחתכות. במבנה שכאן — 231px ואפס חיתוכים. */
+@media (max-width:420px){
+  .c-item{grid-template-columns:52px minmax(0,1fr) auto;padding:9px 11px}
+  .c-time{font-size:14.5px}
+  .c-total{font-size:16px}
+  .c-item.has-act{grid-template-columns:52px minmax(0,1fr) auto}
+  .c-item.has-act>:first-child{grid-row:1/3}
+  .c-item.has-act .c-act{grid-column:2/4;grid-row:2;justify-self:start;
+    inline-size:auto;min-inline-size:152px;min-block-size:40px;margin-top:8px}
+}
+
+/* מתג רשימה/מפה */
+.seg{display:inline-flex;gap:4px;flex:none;padding:3px;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-s)}
+.seg-b{border:0;background:none;border-radius:9px;padding:9px 15px;cursor:pointer;
+  font-weight:700;font-size:14px;letter-spacing:-.2px;color:var(--muted);
+  transition:background .15s var(--ease-soft),color .15s var(--ease-soft)}
+.seg-b:hover{color:var(--text)}
+.seg-b.on{background:var(--accent-solid);color:var(--on-accent)}
+.seg-b:focus-visible{box-shadow:var(--ring)}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition-duration:.01ms !important;animation-duration:.01ms !important}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-in">
+    <div class="logo">
+      <img class="dot" src="assets/logo-mark-96.png" width="30" height="30" alt="" decoding="async">
+      <img class="wordmark" src="assets/wordmark.png" width="300" height="60" alt="משמרת" decoding="async">
+    </div>
+    <span class="spacer"></span>
+    <button id="who" class="link" style="padding:6px 4px;font-size:13.5px" hidden></button>
+    <button id="themeBtn" type="button" aria-label="החלפת ערכת צבעים" aria-pressed="false" title="בהיר / כהה">
+      <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <path d="M20.6 14.4A8.6 8.6 0 0 1 9.6 3.4a8.6 8.6 0 1 0 11 11Z"/>
+      </svg>
+      <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="4.1"/>
+        <path d="M12 2.7v2.1M12 19.2v2.1M4.9 4.9l1.5 1.5M17.6 17.6l1.5 1.5M2.7 12h2.1M19.2 12h2.1M4.9 19.1l1.5-1.5M17.6 6.4l1.5-1.5"/>
+      </svg>
+    </button>
+    <button class="btn ghost" id="outBtn" hidden>יציאה</button>
+  </div>
+</header>
+
+<script>
+/* ---------- מתג ערכת הצבעים ----------
+   עצמאי לחלוטין: לא נוגע במודול האפליקציה, לא חולק איתו משתנים,
+   ומדבר רק עם data-theme על <html> ועם localStorage.
+   כל עוד המשתמש לא בחר ידנית — ההגדרה נקבעת לפי המערכת. */
+(function(){
+  var root=document.documentElement, btn=document.getElementById('themeBtn');
+  if(!btn) return;
+  var mq=window.matchMedia('(prefers-color-scheme: dark)');
+  var meta=document.querySelector('meta[name="theme-color"]');
+  function current(){
+    var v=root.getAttribute('data-theme');
+    return (v==='light'||v==='dark') ? v : (mq.matches?'dark':'light');
+  }
+  function sync(mode){
+    if(meta) meta.setAttribute('content', mode==='dark' ? '#0a1020' : '#ffffff');
+    btn.setAttribute('aria-pressed', mode==='dark' ? 'true' : 'false');
+  }
+  btn.addEventListener('click',function(){
+    var next = current()==='dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme',next);
+    try{ localStorage.setItem('mishmeret-theme',next); }catch(e){}
+    sync(next);
+  });
+  // שינוי בהגדרת המערכת ממשיך להשפיע כל עוד אין בחירה ידנית שמורה
+  mq.addEventListener('change',function(){ if(!root.getAttribute('data-theme')) sync(current()); });
+  sync(current());
+})();
+</script>
+
+<div class="wrap"><main id="view"></main></div>
+
+<script>
+/* ---------- ליטוש פקדים ----------
+   עצמאי כמו מתג הערכה: לא נוגע במודול האפליקציה ולא חולק איתו דבר.
+   תפקידו היחיד הוא לחשוף ל-CSS מידע שהוא לא יכול לחשב לבד. */
+(function(){
+  var view=document.getElementById('view');
+
+  // כמה אחוז מהפס כבר נבחר. CSS לא יודע לקרוא value של input,
+  // ובלי זה הסליידר הוא קו אפור אחיד שלא מראה איפה המשתמש עומד.
+  function fillRange(el){
+    var min=parseFloat(el.min||0), max=parseFloat(el.max||100), v=parseFloat(el.value);
+    if(!isFinite(min)||!isFinite(max)||max===min) return;
+    var pct=(v-min)/(max-min)*100;
+    el.style.setProperty('--fill', Math.max(0,Math.min(100,pct))+'%');
+  }
+  function fillAll(){
+    var list=document.querySelectorAll('input[type=range]');
+    for(var i=0;i<list.length;i++) fillRange(list[i]);
+  }
+  // בשלב ההסעה, כדי לתפוס גם קלט על אלמנטים שנוצרו אחרי הטעינה
+  document.addEventListener('input', function(e){
+    if(e.target && e.target.type==='range') fillRange(e.target);
+  }, true);
+  // ה-JS מצייר את #view מחדש ומחליף את הסליידר באלמנט חדש בלי ערך --fill
+  if(view && window.MutationObserver){
+    new MutationObserver(fillAll).observe(view,{childList:true,subtree:true});
+  }
+  fillAll();
+})();
+</script>
+<nav class="tabs" id="tabs" hidden>
+  <div class="tabs-in">
+    <button class="tab" data-tab="board">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <rect x="3.3" y="5" width="17.4" height="15.7" rx="3.2"/>
+        <path d="M8 2.9v4.2M16 2.9v4.2M3.3 10.2h17.4"/>
+        <circle cx="12" cy="15.3" r="2.3" fill="currentColor" stroke="none"/>
+      </svg><span class="lbl"></span></button>
+    <button class="tab" data-tab="biz">
+      <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <path d="M3.6 9.3 5 4.9a1.6 1.6 0 0 1 1.5-1.1h11A1.6 1.6 0 0 1 19 4.9l1.4 4.4"/>
+        <path d="M4.6 9.3v9.4a1.8 1.8 0 0 0 1.8 1.8h11.2a1.8 1.8 0 0 0 1.8-1.8V9.3"/>
+        <path d="M3.6 9.3a2.9 2.9 0 0 0 5.6 0 2.9 2.9 0 0 0 5.6 0 2.9 2.9 0 0 0 5.6 0"/>
+        <path d="M9.7 20.5v-5.2h4.6v5.2"/>
+      </svg><span class="lbl"></span></button>
+  </div>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+const SUPABASE_URL = 'https://rkmjggormlxcvzuqedig.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_YaNOnDlnvZjfamoCKpYCzA_IxMmdarN';
+
+// הטלפון הוא המזהה. מנגנון ההתחברות דורש פורמט כתובת, אז הטלפון
+// ממופה לכתובת פנימית על דומיין שבבעלותנו. המשתמש לא רואה אותה.
+const PHONE_DOMAIN = 'mak-bag.com';
+
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const S = {
+  user:null, profile:null, cities:[], termRows:[], terms:{}, termList:{},
+  shifts:[], apps:{}, mine:[], radius:20,
+  bizList:[], biz:null, bizShifts:[], applicants:{}, team:[], people:{},
+  bizRole:'manager', shiftId:null, confirmCancel:null, confirmClose:false,
+  screen:'loading', tab:'board', err:'',
+  view:'list', mapErr:''
+};
+// תצוגת הלוח נשמרת בין ביקורים. localStorage עלול לזרוק בחלון פרטי.
+try{ if(localStorage.getItem('mishmeret-board-view') === 'map') S.view = 'map'; }catch(e){}
+const saveView = v => { try{ localStorage.setItem('mishmeret-board-view', v); }catch(e){} };
+
+const el  = id => document.getElementById(id);
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let toastT;
+// הודעה קצרה, ובמקרים מסוימים גם פעולת חזרה. חלון הביטול בשרת הוא
+// שתי דקות; ההודעה נשארת פחות מזה בכוונה, כדי שלא תסתיר את המסך.
+function toast(m, action){
+  if(!m) return;
+  const e = el('toast');
+  e.textContent = '';
+  const span = document.createElement('span');
+  span.textContent = m;
+  e.appendChild(span);
+  if(action){
+    const b = document.createElement('button');
+    b.className = 'toast-act';
+    b.textContent = action.label;
+    b.onclick = () => { e.classList.remove('on'); action.run(); };
+    e.appendChild(b);
+  }
+  e.classList.add('on');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => e.classList.remove('on'), action ? 9000 : 2800);
+}
+
+// 0501234567 -> 972501234567
+function normalizePhone(raw){
+  const d = String(raw||'').replace(/\D/g,'');
+  if(!d) return null;
+  if(d.startsWith('972')) return d;
+  if(d.startsWith('0'))   return '972' + d.slice(1);
+  return d;
+}
+const phoneToEmail = p => `${p}@${PHONE_DOMAIN}`;
+
+/* ---------- טקסטים ---------- */
+const termLabel = (kind, code) => S.terms[kind]?.[code] ?? code;
+const ui = code => S.terms.ui?.[code] ?? '';
+const fill = (t, n) => String(t).replace('{n}', n);
+// מחרוזת שנושאת מספר מפוצלת ליחיד ולרבים; הלקוח בוחר, לא מרכיב משפט
+const plural = (code, n) => fill(ui(`${code}.${n === 1 ? 'one' : 'other'}`), n);
+
+// קוד תוצאה מהשרת -> משפט בשפת המשתמש. קוד שאין לו תרגום לא מוצג
+// למשתמש לעולם — יש נוסח כללי במקומו.
+function resultText(code, scope){
+  const t = S.terms.ui || {};
+  return (scope && t[`result.${scope}.${code}`]) || t[`result.${code}`] || ui('ui.unknown_result');
+}
+
+/* ---------- זמנים ---------- */
+const hhmm  = d => d.toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+/* מרחק בימים קלנדריים. מנרמלים את שני הצדדים לחצות מקומית לפני
+   החיסור: חיסור חותמת מלאה פחות חצות נותן שבר יום, ו-round עליו דחף
+   כל משמרת שמתחילה אחרי 12:00 ליום הבא — משמרת של היום ב-18:00
+   הוצגה "מחר". round על הפרש בין שתי חצותים גם סופג את שעת המעבר
+   לשעון קיץ. נמצא ברתמת הלקוח בסבב N. */
+const dayOffset = d => Math.round(
+  (new Date(d).setHours(0,0,0,0) - new Date().setHours(0,0,0,0)) / 864e5);
+function whenLabel(start){
+  const days = dayOffset(start);
+  return days===0 ? 'היום' : days===1 ? 'מחר'
+       : start.toLocaleDateString('he-IL',{weekday:'long',day:'numeric',month:'numeric'});
+}
+const hoursBetween = (a,b) => Math.round((b-a)/36e5*10)/10;
+const pad2 = n => String(n).padStart(2,'0');
+function localISO(dateStr, timeStr, addDay){
+  const [y,m,d]   = dateStr.split('-').map(Number);
+  const [hh,mi]   = timeStr.split(':').map(Number);
+  return new Date(y, m-1, d + (addDay?1:0), hh, mi, 0, 0).toISOString();
+}
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+
+/* ---------- טעינת נתוני יסוד ---------- */
+async function loadReference(){
+  const [{data:cities},{data:terms}] = await Promise.all([
+    // lat/lng של העיר הם מרכוז המפה ומרכז עיגול הרדיוס. cities פתוחה
+    // לקריאה גם ל-anon, ומרכז עיר הוא מידע ציבורי — אין כאן חשיפה.
+    sb.from('cities').select('id, slug, lat, lng, city_names(lang,name)').order('id'),
+    sb.from('terms').select('kind, code, lang, label, sort').order('sort')
+  ]);
+  S.cities = (cities||[]).map(c => ({
+    id: c.id, lat: c.lat, lng: c.lng,
+    name: (c.city_names||[]).find(n=>n.lang==='he')?.name || c.slug
+  })).sort((a,b)=>a.name.localeCompare(b.name,'he'));
+  S.termRows = terms || [];
+  buildTerms('he');
+}
+
+// עברית היא הבסיס; שפת המשתמש דורסת אותה היכן שיש תרגום.
+function buildTerms(lang){
+  S.terms = {}; S.termList = {};
+  const put = r => { (S.terms[r.kind] ||= {})[r.code] = r.label; };
+  for(const r of S.termRows) if(r.lang === 'he') put(r);
+  if(lang && lang !== 'he') for(const r of S.termRows) if(r.lang === lang) put(r);
+  const seen = {};
+  for(const r of S.termRows){
+    if(r.lang !== 'he') continue;
+    (seen[r.kind] ||= new Set());
+    if(seen[r.kind].has(r.code)) continue;
+    seen[r.kind].add(r.code);
+    (S.termList[r.kind] ||= []).push({ code:r.code, label:S.terms[r.kind][r.code] });
+  }
+}
+
+/* תאריך הלידה לא ניתן לקריאה מהטבלה — my_profile היא הדרך היחידה
+   לקבל אותו בחזרה, ולכן כל הפרופיל נטען דרכה. */
+async function loadProfile(){
+  const { data } = await sb.rpc('my_profile');
+  S.profile = data || null;
+  if(S.profile?.search_radius_km) S.radius = S.profile.search_radius_km;
+  buildTerms(S.profile?.preferred_lang || 'he');
+}
+
+// בלי אלה claim_shift מסרב, ולכן הם נדרשים לפני כל הגשה
+const profileReady = () =>
+  !!(S.profile?.given_name && S.profile?.home_city_id && S.profile?.birth_date);
+const displayName = () => {
+  const p = S.profile || {};
+  return [p.given_name, p.family_name].filter(Boolean).join(' ') || p.full_name || '';
+};
+
+const SHIFT_COLS = 'id, business_id, biz_name, city, role_code, starts_at, ends_at, rate, slots, filled, urgent, instant, transport, descr, max_distance_km, exp_code, adults_only, cancelled_at, cancel_reason, created_by, created_at';
+
+/* העובד: הלוח, והמשמרות שהוא כבר קשור אליהן.
+   shifts_for_me מסנן בוטלו ומלאות, ולכן משמרת שהעובד שובץ אליה נעלמת
+   ממנו — my_shifts הוא המסך שמחזיר לו אותה, כולל הכתובת. */
+async function loadBoard(){
+  const [{ data:board, error }, { data:mine }] = await Promise.all([
+    sb.rpc('shifts_for_me', { p_radius_km: S.radius }),
+    sb.rpc('my_shifts')
+  ]);
+  if(error){ S.err = friendly(error.message); S.shifts = []; } else { S.err=''; S.shifts = board || []; }
+  const now = new Date();
+  S.mine = (mine || []).filter(m => new Date(m.ends_at) > now);
+  S.apps = Object.fromEntries(S.mine.map(m => [m.shift_id, m.app_status]));
+
+  /* פרטי העסקים שמופיעים בלוח — אימות וכתובת מדויקת. כתובת של מסעדה
+     היא מידע פומבי (העובד צריך להגיע אליה), ולכן היא מוצגת כבר בלוח
+     ולא רק אחרי שיבוץ. shifts_for_me לא מחזיר אותה, אז מצטרפים כאן. */
+  S.verified = {}; S.bizAddr = {};
+  const bizIds = [...new Set(S.shifts.map(s => s.business_id))];
+  if(bizIds.length){
+    /* located_at לא מגיע מכאן: הוא צילום מצב של המשמרת, לא מצב נוכחי
+       של העסק. shifts_for_me מחזיר SETOF shifts ולכן s.located_at כבר
+       בשורה. עסק שסימן סיכה אחרי שהמשמרת פורסמה לא הופך משמרת ישנה
+       למדויקת — לכן מקור האמת הוא השורה, לא ה-join. */
+    const { data:bs } = await sb.from('businesses')
+      .select('id, address, city, verified_at').in('id', bizIds);
+    for(const b of (bs||[])){
+      S.verified[b.id] = !!b.verified_at;
+      S.bizAddr[b.id]  = { address:b.address, city:b.city };
+    }
+  }
+  /* אותה כתובת גם למשמרות שהעובד כבר קשור אליהן, כשהיא טרם נחשפה.
+     located_at לא מושלם כאן: my_shifts מחזיר את located_at של המשמרת
+     עצמה. ההשלמה מ-S.bizAddr כיסתה רק משמרות שגם מופיעות בלוח — כלומר
+     לא את המאושרות, שהן בדיוק המקרה שבו הניווט קובע לאן העובד נוסע.
+     lat/lng של המשמרת לא נדרסים: הם צילום מצב מזמן הפרסום. */
+  const byShift = Object.fromEntries(S.shifts.map(s => [s.id, s.business_id]));
+  for(const m of S.mine){
+    if(m.address) continue;
+    const info = S.bizAddr[byShift[m.shift_id]];
+    if(info?.address) m.address = info.address;
+  }
+}
+
+/* המעסיק: העסקים שלו, המשמרות, המועמדים והצוות הקבוע */
+async function loadBiz(){
+  const { data:mem } = await sb.from('business_members')
+    .select('business_id, role').eq('user_id', S.user.id);
+  const ids = (mem||[]).map(m => m.business_id);
+  S.bizList = []; S.bizShifts = []; S.applicants = {}; S.team = []; S.people = {};
+  if(!ids.length){ S.biz = null; return; }
+
+  const { data:bs } = await sb.from('businesses')
+    // lat/lng/located_at: טופס העריכה צריך לדעת איפה להעמיד את הסיכה,
+    // ואם בכלל סומנה אחת
+    .select('id, name, kind, phone, city, city_id, address, closed_at, lat, lng, located_at')
+    .in('id', ids).order('name');
+  S.bizList = bs || [];
+  S.biz = S.bizList.find(b => b.id === S.biz?.id) || S.bizList[0] || null;
+  if(!S.biz) return;
+  // עריכת פרטי עסק וסגירתו הן פעולות של בעלים בלבד
+  S.bizRole = (mem||[]).find(m => m.business_id === S.biz.id)?.role || 'manager';
+
+  const { data:sh } = await sb.from('shifts').select(SHIFT_COLS)
+    .eq('business_id', S.biz.id).order('starts_at', { ascending:true });
+  S.bizShifts = sh || [];
+
+  // מועמדים נטענים למשמרות החיות, כדי שהמונה על הכרטיס יהיה אמיתי
+  const now = new Date();
+  const live = S.bizShifts.filter(s => !s.cancelled_at && new Date(s.ends_at) > now);
+  await Promise.all(live.map(s => loadApplicants(s.id)));
+
+  const { data:team } = await sb.from('team_members')
+    .select('worker_id, created_at').eq('business_id', S.biz.id).order('created_at');
+  S.team = team || [];
+
+  // שמות של חברי הצוות הקבוע ושל המגייסים שפרסמו משמרות
+  const { data:staff } = await sb.from('business_members')
+    .select('user_id').eq('business_id', S.biz.id);
+  const names = [...new Set([
+    ...S.team.map(t => t.worker_id),
+    ...(staff||[]).map(m => m.user_id)
+  ])];
+  if(names.length){
+    const { data:profs } = await sb.from('profiles')
+      .select('id, full_name, given_name, family_name, home_city_id').in('id', names);
+    for(const p of (profs||[]))
+      S.people[p.id] = {
+        name: [p.given_name, p.family_name].filter(Boolean).join(' ') || p.full_name,
+        cityId: p.home_city_id
+      };
+  }
+}
+
+// מי רשאי לנהל משמרת: מי שפרסם אותה, או בעלים של העסק. השרת אוכף
+// את זה בעצמו ומחזיר not_yours — כאן רק לא מציגים כפתור שיסרב.
+const mayManage = s => s.created_by === S.user.id || S.bizRole === 'owner';
+const postedBy  = s => S.people[s.created_by]?.name || '';
+
+async function loadApplicants(shiftId){
+  const { data } = await sb.rpc('shift_applicants', { p_shift: shiftId });
+  S.applicants[shiftId] = data || [];
+}
+
+const cityName = id => S.cities.find(c => c.id === id)?.name || '';
+const appsOf   = id => S.applicants[id] || [];
+const activeOf = id => appsOf(id).filter(a => ['applied','offered','confirmed'].includes(a.status));
+
+/* ---------- מסכים: כניסה ---------- */
+function authScreen(mode){
+  const isSignup = mode === 'signup';
+  return `<h1>${isSignup ? 'הרשמה' : 'כניסה'}</h1>
+  <div class="sub">${isSignup ? 'שלושה שדות וסיימנו.' : 'טלפון וסיסמה.'}</div>
+  <form class="panel" id="authForm">
+    <label for="f_phone">טלפון</label>
+    <input id="f_phone" name="phone" type="tel" inputmode="numeric" autocomplete="tel"
+           placeholder="050-0000000" required>
+    ${isSignup ? `
+    <label for="f_name">שם מלא</label>
+    <input id="f_name" name="name" autocomplete="name" placeholder="השם שלך" required>
+    <label for="f_city">עיר מגורים</label>
+    ${cityField('f_city', null)}` : ''}
+    <label for="f_pass">סיסמה</label>
+    <input id="f_pass" name="pass" type="password" minlength="6"
+           autocomplete="${isSignup ? 'new-password' : 'current-password'}"
+           placeholder="לפחות 6 תווים" required>
+    <button class="btn" type="submit">${isSignup ? 'יצירת חשבון' : 'כניסה'}</button>
+    ${isSignup ? `<div class="note">ההרשמה מהווה הסכמה לתנאי השימוש. הפלטפורמה מחברת בין
+      מעסיקים לעובדים ואינה צד להעסקה. אין להעביר תשלום מראש עבור שיבוץ.</div>` : ''}
+  </form>
+  <div style="text-align:center;margin-top:8px">
+    <button class="link" id="swap">${isSignup ? 'כבר יש לי חשבון' : 'אין לי חשבון עדיין'}</button>
+  </div>`;
+}
+
+/* שדה עיר עם חיפוש. רשימה של 46 ערים בתפריט נגלל היא גלילה ארוכה
+   בטלפון; כאן מקלידים אות והרשימה מצטמצמת. השם הוא מה שהמשתמש
+   רואה, אבל מה שנשלח הוא תמיד המזהה המספרי מהשדה הנסתר. */
+function cityField(id, selected){
+  const cur = S.cities.find(c => c.id === selected);
+  return `<input id="${id}" class="city-in" list="${id}_list" autocomplete="off"
+           inputmode="search" placeholder="${esc(ui('ui.city_search'))}"
+           value="${esc(cur?.name || '')}" required>
+  <input type="hidden" name="city" id="${id}_val" value="${cur ? cur.id : ''}">
+  <datalist id="${id}_list">${
+    S.cities.map(c => `<option value="${esc(c.name)}"></option>`).join('')
+  }</datalist>`;
+}
+
+// המרת מה שהוקלד למזהה עיר. אין התאמה — השדה הנסתר נשאר ריק,
+// והשרת ממילא מחזיר city_not_found.
+function wireCityFields(){
+  for(const inp of document.querySelectorAll('.city-in')){
+    const hidden = el(inp.id + '_val');
+    // משלימים רק כשיש התאמה אחת ויחידה. אם ההקלדה מתאימה לכמה ערים,
+    // לא מנחשים — אחרת המשתמש רואה אות אחת ונשמרת לו עיר אחרת.
+    const resolve = () => {
+      const typed = inp.value.trim();
+      if(!typed){ hidden.value = ''; return; }
+      const exact = S.cities.find(c => c.name === typed);
+      const starts = S.cities.filter(c => c.name.startsWith(typed));
+      const hit = exact || (starts.length === 1 ? starts[0] : null);
+      hidden.value = hit ? hit.id : '';
+      if(hit) inp.value = hit.name;
+    };
+    inp.oninput  = () => {
+      const t = inp.value.trim();
+      const exact = S.cities.find(c => c.name === t);
+      hidden.value = exact ? exact.id : '';
+    };
+    inp.onchange = resolve;
+    inp.onblur   = resolve;
+  }
+}
+
+/* ---------- מפות ----------
+   Leaflet נטענת רק בפתיחה הראשונה של מפה, לא בטעינת האפליקציה: היא
+   שוקלת יותר מכל שאר הדף, ורוב המשתמשים לא יפתחו מפה בכלל.
+   האריחים הם OpenStreetMap — בלי מפתח ובלי חיוב. ה-attribution הוא
+   תנאי רישוי ולא קרדיט, ולכן הוא נשאר גלוי. */
+const LEAFLET_CSS = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css';
+const LEAFLET_JS  = 'https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js';
+const TILE_URL    = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_ATTR   = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>';
+
+let leafletP = null;
+function loadLeaflet(){
+  if(window.L) return Promise.resolve(window.L);
+  // הבטחה אחת נשמרת: שתי מפות שנפתחות יחד לא טוענות את הספרייה פעמיים
+  if(leafletP) return leafletP;
+  leafletP = new Promise((resolve, reject) => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet'; css.href = LEAFLET_CSS;
+    document.head.appendChild(css);
+    const js = document.createElement('script');
+    js.src = LEAFLET_JS;
+    js.onload  = () => window.L ? resolve(window.L) : reject(new Error('leaflet'));
+    // איפוס ההבטחה: אם ה-CDN לא זמין כרגע, ניסיון הבא ינסה שוב
+    js.onerror = () => { leafletP = null; reject(new Error('leaflet')); };
+    document.head.appendChild(js);
+  });
+  return leafletP;
+}
+
+/* render() דורס את #view.innerHTML אחרי כל פעולה. מופע Leaflet ששרד
+   את הדריסה הוא דליפת זיכרון, והיצירה הבאה על אותו מזהה זורקת
+   "Map container is already initialized". לכן killMaps() רצה בתחילת
+   render(), לפני הצבת ה-HTML, וכל מפה נבנית ב-wire() אחרי שה-DOM קיים. */
+let boardMap = null, pickMap = null;
+function killMaps(){
+  if(boardMap){ boardMap.remove(); boardMap = null; }
+  if(pickMap) { pickMap.remove();  pickMap  = null; }
+}
+
+const num = v => (v === null || v === undefined || v === '') ? null : Number(v);
+const hasPoint = o => Number.isFinite(num(o?.lat)) && Number.isFinite(num(o?.lng));
+
+/* Leaflet מודדת את המיכל פעם אחת ושומרת את המידה במטמון. אם היא
+   נמדדה לפני שהפריסה הסתיימה, getSize מחזיר רוחב 0 — ואז getBoundsZoom
+   מחזיר את הזום המרבי, fitBounds נחתך ל-maxZoom, והמפה נפתחת מקורבת
+   עד כדי כך שאף סמן לא בתוך המסגרת. נצפה בפועל ברתמה: רוחב 0,
+   getBoundsZoom החזיר 19, המפה נפתחה ב-15 ושני הסמנים היו מחוץ למסך.
+   invalidateSize לבדו לא מספיק אם הוא רץ אחרי קביעת התצוגה, ולכן
+   קובעים את התצוגה רק כשלמיכל יש רוחב אמיתי. */
+function whenSized(holder, map, apply){
+  let done = false, ro = null;
+  const run = () => {
+    if(done || !map || !holder.isConnected) return;
+    if(holder.clientWidth <= 0) return;         // עוד אין פריסה — נחכה
+    done = true;
+    if(ro) ro.disconnect();
+    map.invalidateSize();
+    apply();
+  };
+  // ResizeObserver יורה גם על המידה הנוכחית וגם על המעבר מ-0 לרוחב
+  // אמיתי, ולכן הוא נכון גם כשהלשונית ברקע ו-requestAnimationFrame
+  // לא מתקדם בכלל.
+  if(window.ResizeObserver){ ro = new ResizeObserver(run); ro.observe(holder); }
+  run();
+  // רשת ביטחון: מפה בלי תצוגה היא מלבן אפור. אם המשקיף לא ירה
+  // בשנייה וחצי — קובעים תצוגה בכל מקרה, גם אם המידה לא אידיאלית.
+  setTimeout(() => {
+    if(done || !map || !holder.isConnected) return;
+    done = true;
+    if(ro) ro.disconnect();
+    map.invalidateSize();
+    apply();
+  }, 1500);
+}
+
+/* ---------- מסכים: לוח העובד ---------- */
+/* כתובת, טלפון וניווט. הכתובת והטלפון מגיעים מהשרת רק כשמותר, ולכן
+   השורה נבנית מהחלקים שקיימים בפועל — בלי מפרידים ריקים. */
+/* יעד הניווט נקבע לפי located_at, ולא לפי קיום כתובת.
+   עודכן בסבב M — הערה קודמת כאן אמרה ש-lat/lng הם תמיד מרכז העיר,
+   וזה כבר לא נכון:
+   - יש located_at → המעסיק סימן סיכה בעצמו. נווט לקואורדינטה; היא
+     מדויקת יותר מכתובת חופשית שאף אחד לא אימת ולא גיאוקודד.
+   - אין located_at → הקואורדינטה היא מרכז העיר, וניווט לפיה מוביל
+     לרחוב אחר. נווט לכתובת; Waze יודע לחפש אותה בעצמו.
+   - אין גם וגם → אין קישור ניווט.
+   אין לגעת ב-lat/lng עצמם כדי "לתקן" ניווט: מהם נגזר shifts.location,
+   והם קובעים למי המשמרת בכלל מוצגת. */
+function wazeUrl(o){
+  if(o.located_at && hasPoint(o))
+    return `https://waze.com/ul?ll=${num(o.lat)},${num(o.lng)}&navigate=yes`;
+  if(o.address)
+    return `https://waze.com/ul?q=${encodeURIComponent(`${o.address}, ${o.city}`)}&navigate=yes`;
+  /* אין דגל ואין כתובת → אין קישור. במכוון אין כאן נפילה לקואורדינטה:
+     היא מרכז העיר, וקישור ניווט אליה מציג אותה כיעד. זו בדיוק ההבטחה
+     השקרית שהסבב הזה סוגר. (התנהגות קודמת נפלה לכאן ל-?ll=; נתפס
+     ברתמת הלקוח — משמרת בלי located_at ובלי כתובת קיבלה ניווט.) */
+  return '';
+}
+
+function locationLine(o){
+  const parts = [];
+  const nav = wazeUrl(o);
+  if(o.address)        parts.push(`<span class="icon icon-pin"></span> ${esc(o.city)} · ${esc(o.address)}`);
+  if(o.biz_phone)      parts.push(`<a href="tel:${esc(o.biz_phone)}"><span class="icon icon-phone"></span> ${esc(o.biz_phone)}</a>`);
+  if(nav)              parts.push(`<a href="${esc(nav)}"
+                          target="_blank" rel="noopener"><span class="icon icon-nav"></span> ${esc(ui('ui.waze'))}</a>`);
+  return parts.length ? `<div class="hint">${parts.join(' · ')}</div>` : '';
+}
+
+// מעטפת משותפת לכרטיס משמרת בצד העובד. השדות מגיעים משני מקורות
+// שונים (shifts_for_me ו-my_shifts), ולכן מועברים מפורשות.
+function workerCard(o){
+  const start = new Date(o.starts_at), end = new Date(o.ends_at);
+  const hours = hoursBetween(start, end);
+  const days  = dayOffset(start);
+  return `<article class="card ${o.dim?'dim':''} ${o.urgent&&!o.dim?'urgent':''}">
+    <div class="card-head">
+      <div>
+        <div class="role">${esc(termLabel('role', o.role_code))}</div>
+        <div class="biz">${esc(o.biz_name)} · ${esc(o.city)}</div>
+      </div>
+      <div class="pay"><span class="rate"><span class="cur">₪</span>${esc(Number(o.rate))}</span>
+        <span class="per">לשעה · ≈₪${Math.round(hours*o.rate)}</span></div>
+    </div>
+    <div class="meta">
+      <span class="tag ${days===0?'today':''}">${whenLabel(start)}</span>
+      <span class="tag">${hhmm(start)}–${hhmm(end)} · ${hours} ש׳</span>
+      ${o.instant?'<span class="tag instant"><span class="icon icon-bolt"></span> שיבוץ מיידי</span>':''}
+      ${o.urgent ?'<span class="tag hot">דחוף</span>':''}
+      ${o.adults_only?`<span class="tag hot">${esc(ui('ui.adults_only'))}</span>`:''}
+      ${o.extra || ''}
+      ${o.transport?'<span class="tag"><span class="icon icon-van"></span> הסעות</span>':''}
+    </div>
+    ${locationLine(o)}
+    ${o.cancel_reason ? `<div class="err">${esc(o.cancel_reason)}</div>` : ''}
+    ${o.descr ? `<div class="desc">${esc(o.descr)}</div>` : ''}
+    <div class="card-foot">${o.action}</div>
+  </article>`;
+}
+
+// אותו כפתור בכרטיס ובפופאפ של המפה. משותף כדי שלא תיווצר גרסה
+// שנייה של אותו טקסט שתסטה מהראשונה.
+const claimBtn = (s, cls='') =>
+  `<button class="btn${cls ? ' ' + cls : ''}" data-claim="${s.id}">${
+    s.instant ? '<span class="icon icon-bolt"></span> תפיסת המשמרת' : 'הגשת מועמדות'}</button>`;
+
+/* ---------- לוח המשמרות: חלופה ג, ציר זמן מקובץ ----------
+   ארבעה דליים לפי מרחק בימים מהיום. דלי ריק לא מוצג.
+   **המיון בתוך דלי הוא מה שהשרת החזיר** (starts_at, ואז דחוף, ואז
+   תעריף) — אין מיון מחדש בלקוח. הקיבוץ שומר על סדר ההגעה. */
+// bucket_thisweek ולא bucket_weekend: הגבול הוא d<=6, ולכן ביום ראשון
+// משמרת של יום שלישי נופלת לכאן — "סוף השבוע" הייתה תווית שקרית
+const BUCKETS = ['ui.bucket_today','ui.bucket_tomorrow','ui.bucket_thisweek','ui.bucket_later'];
+// n<=0 ולא n===0: משמרת שהתחילה היום ועוד לא הסתיימה נשארת ב"היום"
+const bucketOf  = d => { const n = dayOffset(d); return n <= 0 ? 0 : n === 1 ? 1 : n <= 6 ? 2 : 3; };
+
+function boardBuckets(){
+  const g = [[],[],[],[]];
+  for(const s of boardShifts()) g[bucketOf(new Date(s.starts_at))].push(s);
+  return g;
+}
+
+/* שורה בחלופה ג. הדגלים הם טקסט זעיר ולא תגיות: בצפיפות הזו תגית
+   מלאה הורסת את הסריקה. שעת הסיום יורדת לקו הדגלים ולא לעמודת הזמן,
+   כדי שהעין תסרוק מספר אחד בעמודה ולא שניים. */
+function shiftRow(s, bucketActs, showDay){
+  const start = new Date(s.starts_at), end = new Date(s.ends_at);
+  const hours = hoursBetween(start, end);
+  const free  = Math.max(s.slots - s.filled, 0);
+  const ok    = S.verified[s.business_id];
+  /* בדליים "השבוע" ו"בהמשך" השעה לבדה לא אומרת מתי. יום בשבוע נכנס
+     לרצועת הזמן בתוך .c-len ולא כאלמנט שלישי, כדי שגובה השורה לא יזוז
+     ובלי מחלקה חדשה שאינה בחוזה §2. זו בחירת מיקום — הרצועה היא של
+     המעצב, והעברה משורה אחת לאחרת היא שינוי של שורה אחת. */
+  const dayShort = showDay ? start.toLocaleDateString('he-IL',{weekday:'short'}) : '';
+  // .c-act רק היכן שאפשר להגיש בפועל
+  const canClaim = free > 0;
+  const f = [];
+  f.push(`<span class="num">${esc(fill(ui('ui.flag_until'), hhmm(end)))}</span>`);
+  if(s.urgent)      f.push('<span class="hot">דחוף</span>');
+  if(s.adults_only) f.push(`<span class="hot">${esc(ui('ui.adults_only'))}</span>`);
+  if(s.slots > 1)   f.push(`<span class="need num">${esc(plural('ui.slots_left', free))}</span>`);
+  if(s.transport)   f.push('<span><span class="icon icon-van"></span> הסעות</span>');
+  if(!ok)           f.push(`<span>${esc(ui('ui.unverified_biz'))}</span>`);
+  // צילום המצב של המשמרת, לא מצב העסק כרגע
+  if(!s.located_at) f.push(`<span>${esc(ui('ui.approx_location'))}</span>`);
+
+  return `<div class="c-item ${s.urgent?'urgent':''} ${bucketActs?'has-act':''}">
+    <div>
+      <span class="c-time num">${hhmm(start)}</span>
+      <span class="c-len num">${dayShort ? esc(dayShort) + ' · ' : ''}${hours} ש׳</span>
+    </div>
+    <div class="c-mid">
+      <div class="c-role">${s.instant?'<span class="icon icon-bolt"></span>':''}${esc(termLabel('role', s.role_code))}</div>
+      <div class="c-sub">${esc(s.biz_name)}${ok?' <span class="vr">✓</span>':''} · ${esc(s.city)}</div>
+      <div class="c-flags">${f.join('')}</div>
+    </div>
+    <div class="c-end">
+      <span class="c-total num"><span class="cur">₪</span>${Math.round(hours * s.rate)}</span>
+      <span class="c-rate num">₪${esc(Number(s.rate))} לשעה</span>
+    </div>
+    ${bucketActs && canClaim ? claimBtn(s, 'c-act') : ''}
+  </div>`;
+}
+
+/* .c-act רק בדלי "היום" — החלטה של ה-Tech Lead (§4): שתי המועמדויות
+   המאושרות היחידות במערכת היו על משמרות instant, וזה בדיוק המסלול
+   שחלופה ג מאטה. לא ניסוי.
+
+   .has-act יושב על **כל** שורה בדלי שיש בו פעולה, גם על שורה שאין בה
+   כפתור, ולא רק על השורות עם הכפתור. אחרת שורה בלי כפתור מאבדת את
+   רצועת 152px והסכום שלה קופץ 164px ביחס לשכנתה באותו דלי. נמדד
+   על ידי המעצב, ותוקן לפי ההכרעה ב-START-HERE. */
+function boardListC(){
+  const g = boardBuckets();
+  let out = '';
+  g.forEach((list, i) => {
+    if(!list.length) return;
+    const bucketActs = i === 0;     // דלי "היום" בלבד
+    const showDay    = i >= 2;      // "השבוע" ו"בהמשך": שעה לבדה לא אומרת מתי
+    out += `<div class="c-head"><span class="h">${esc(ui(BUCKETS[i]))}</span>
+      <span class="n num">${esc(plural('ui.bucket_count', list.length))}</span>
+      <span class="line"></span></div>`
+      + list.map(s => shiftRow(s, bucketActs, showDay)).join('');
+  });
+  return out;
+}
+
+// כרטיס מ"המשמרות שלי": הכתובת מגיעה מהשרת רק אחרי שיבוץ
+function myShiftCard(m){
+  let action, dim = false;
+  if(m.cancelled_at){
+    action = `<span class="state" style="color:var(--amber)">${esc(ui('ui.cancelled_by_biz'))}</span>`; dim = true;
+  } else if(m.app_status === 'confirmed') action = `<span class="state">✓ שובצת למשמרת</span>`;
+  else if(m.app_status === 'applied')     action = `<span class="state">✓ המועמדות נשלחה</span>`;
+  else if(m.app_status === 'offered')     action = `<button class="btn" data-accept="${m.shift_id}">אישור המשמרת</button>`;
+  else if(m.app_status === 'cancelled'){
+    action = `<span class="state" style="color:var(--amber)">${esc(ui('ui.booking_cancelled'))}</span>`; dim = true;
+  } else { // declined
+    action = `<span class="state" style="color:var(--muted)">${esc(resultText('declined'))}</span>`; dim = true;
+  }
+  // m.located_at הוא הדגל של המשמרת עצמה, לא של העסק, ומגיע ישירות
+  // מ-my_shifts. הוא מזין את wazeUrl: יש סיכה → ניווט לקואורדינטה.
+  return workerCard({ ...m, dim, action });
+}
+
+/* השלמת פרטי עובד. בלי שם, עיר ותאריך לידה השרת מסרב לכל הגשה,
+   ולכן זה המסך היחיד שחוסם את הלוח. תאריך הלידה נכתב פעם אחת. */
+function profileScreen(){
+  const p = S.profile || {};
+  const locked = !!p.birth_date;
+  return `<button class="back" id="back">${esc(ui('ui.back'))}</button>
+  <h1>${esc(ui('ui.profile'))}</h1>
+  <div class="sub">${esc(ui('ui.profile_needed'))}</div>
+  <form class="panel" id="profileForm">
+    <label for="p_given">${esc(ui('ui.given_name'))}</label>
+    <input id="p_given" name="given" value="${esc(p.given_name||'')}" autocomplete="given-name" required>
+    <label for="p_family">${esc(ui('ui.family_name'))}</label>
+    <input id="p_family" name="family" value="${esc(p.family_name||'')}" autocomplete="family-name">
+    <label for="p_city">עיר מגורים</label>
+    ${cityField('p_city', p.home_city_id)}
+    <label for="p_birth">${esc(ui('ui.birth_date'))}</label>
+    <input id="p_birth" name="birth" type="date" value="${esc(p.birth_date||'')}"
+           ${locked?'disabled':'required'}>
+    <div class="note">${esc(locked ? ui('ui.birth_date_set') : ui('ui.birth_date_why'))}</div>
+    <button class="btn" type="submit">${esc(ui('ui.save'))}</button>
+  </form>`;
+}
+
+/* מקור אמת אחד לשתי התצוגות. אם המפה תסנן בנפרד, משמרת של העסק של
+   המשתמש עצמו תופיע עליה אחרי שכבר הוסתרה מהרשימה.
+   משמרת של עסק שאני חלק ממנו נחסמת בשרת (own_business) — ההסתרה כאן
+   היא כדי שלא ילחץ ויקבל סירוב, לא במקום החסימה. */
+function boardShifts(){
+  return S.shifts.filter(s =>
+    !S.mine.some(m => m.shift_id === s.id) &&
+    !S.bizList.some(b => b.id === s.business_id));
+}
+
+function boardScreen(){
+  const city  = S.cities.find(c => c.id === S.profile?.home_city_id);
+  const board = boardShifts();
+  return `${profileReady() ? '' : `<div class="panel warn">
+    <div>${esc(ui('ui.profile_needed'))}</div>
+    <button class="btn" id="profileBtn">${esc(ui('ui.complete_now'))}</button>
+  </div>`}
+  ${S.mine.length ? `<h1>${esc(ui('ui.my_shifts'))}</h1>
+    <div class="list">${S.mine.map(myShiftCard).join('')}</div>` : ''}
+  <h1>לוח המשמרות</h1>
+  <div class="sub">משמרות בטווח נסיעה מ${esc(city?.name || 'העיר שלך')}.</div>
+  <div class="bar">
+    <div class="grow">
+      <label for="rad">רדיוס נסיעה · ${S.radius} ק״מ</label>
+      <input id="rad" type="range" min="5" max="120" step="5" value="${S.radius}">
+    </div>
+    <div class="seg">
+      <button type="button" class="seg-b ${S.view==='list'?'on':''}" data-view="list"
+              aria-pressed="${S.view==='list'}">${esc(ui('ui.list_view'))}</button>
+      <button type="button" class="seg-b ${S.view==='map'?'on':''}" data-view="map"
+              aria-pressed="${S.view==='map'}">${esc(ui('ui.map_view'))}</button>
+    </div>
+  </div>
+  ${S.err ? `<div class="err">${esc(S.err)}</div>` : ''}
+  ${S.mapErr ? `<div class="panel warn"><div>${esc(S.mapErr)}</div></div>` : ''}
+  ${S.view === 'map'
+    ? `<div id="boardMap" class="map"></div>
+       <div class="hint" id="mapState"></div>
+       <div class="note">${esc(ui('ui.map_radius_note'))}</div>`
+    : (board.length
+        ? `<div class="list-c">${boardListC()}</div>`
+        : `<div class="list"><div class="empty"><span class="big icon icon-calendar"></span>אין כרגע משמרות בטווח שבחרת.<br>נסו להרחיב את הרדיוס.</div></div>`)}`;
+}
+
+/* הפופאפ מציג בדיוק את מה שהכרטיס מציג: אותו תג אימות, אותה כתובת,
+   ואותו כפתור הגשה. תג "מיקום משוער" מופיע כשלמשמרת אין located_at. */
+function venuePopup(list){
+  const s0   = list[0];
+  const ok   = S.verified[s0.business_id];
+  const info = S.bizAddr[s0.business_id] || {};
+  return `<div class="pop">
+    <div class="pop-name">${esc(s0.biz_name)}</div>
+    ${info.address ? `<div class="pop-sub">${esc(info.city || s0.city)} · ${esc(info.address)}</div>` : ''}
+    <div class="meta">
+      <span class="tag ${ok?'done':''}">${esc(ui(ok ? 'ui.verified_biz' : 'ui.unverified_biz'))}</span>
+      ${s0.located_at ? '' : `<span class="tag">${esc(ui('ui.approx_location'))}</span>`}
+    </div>
+    <div class="pop-count">${esc(plural('ui.map_venue_shifts', list.length))}</div>
+    <div class="pop-list">${list.map(s => {
+      const st = new Date(s.starts_at), en = new Date(s.ends_at);
+      return `<div class="pop-row">
+        <div>
+          <div class="pop-role">${esc(termLabel('role', s.role_code))}</div>
+          <div class="pop-when">${esc(whenLabel(st))} · ${hhmm(st)}–${hhmm(en)} · ₪${esc(Number(s.rate))}</div>
+        </div>
+        ${claimBtn(s)}
+      </div>`;
+    }).join('')}</div>
+  </div>`;
+}
+
+/* מפת הלוח. מציירת בדיוק את boardShifts(), לא שורה אחת יותר.
+   אין כאן ולא יהיה geolocation: העובד הוא עיר ורדיוס, והשרת פותר
+   את השאר. קואורדינטה של עובד לא קיימת בממשק ולא נשלחת לשרת. */
+async function openBoardMap(){
+  const holder = el('boardMap'), state = el('mapState');
+  if(!holder) return;
+  const city = S.cities.find(c => c.id === S.profile?.home_city_id);
+  state.textContent = ui('ui.map_loading');
+
+  let L;
+  try{
+    L = await loadLeaflet();
+  }catch(err){
+    // ה-CDN לא זמין. חוזרים לרשימה במקום להשאיר מלבן ריק.
+    S.view = 'list'; saveView('list');
+    S.mapErr = ui('ui.map_failed');
+    render(); return;
+  }
+  if(!el('boardMap')) return;          // המסך התחלף בזמן הטעינה
+  S.mapErr = '';
+
+  boardMap = L.map(holder, { scrollWheelZoom:false, zoomControl:false });
+  L.control.zoom({ position:'bottomleft' }).addTo(boardMap);
+  L.tileLayer(TILE_URL, { maxZoom:19, attribution:TILE_ATTR }).addTo(boardMap);
+
+  // קיבוץ לפי נקודה, לא לפי משמרת: שתי משמרות באותו עסק יושבות על
+  // אותן קואורדינטות, ובלי קיבוץ אחת מהן מוסתרת ובלתי-לחיצה.
+  const groups = new Map();
+  for(const s of boardShifts()){
+    if(!hasPoint(s)) continue;
+    const key = `${num(s.lat).toFixed(6)},${num(s.lng).toFixed(6)}`;
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(s);
+  }
+
+  const pts = [];
+  for(const list of groups.values()){
+    const at    = [num(list[0].lat), num(list[0].lng)];
+    const one   = list.length === 1;
+    const approx = !list[0].located_at;
+    const label = one ? `₪${Number(list[0].rate)}` : String(list.length);
+    const mk = L.marker(at, {
+      icon: L.divIcon({
+        className:'',
+        html:`<span class="pin-shift${one?'':' many'}${approx?' approx':''}">${esc(label)}</span>`,
+        iconSize:[46,32], iconAnchor:[23,32], popupAnchor:[0,-30]
+      })
+    }).addTo(boardMap).bindPopup(venuePopup(list), { minWidth:240, maxWidth:300 });
+    // Leaflet כותבת transform על אלמנט הסמן עצמו, ולכן מצב "פתוח"
+    // חייב לשבת על ה-span הפנימי שלנו ולא על העטיפה שלה.
+    mk.on('popupopen',  e => e.target.getElement()?.firstElementChild?.classList.add('is-open'));
+    mk.on('popupclose', e => e.target.getElement()?.firstElementChild?.classList.remove('is-open'));
+    pts.push(at);
+  }
+
+  // מרכז העיר של העובד ועיגול הרדיוס. זו לא קישוטיות: הרדיוס נמדד
+  // ממרכז העיר ולא מכתובת הבית, והמפה היא המקום היחיד שבו
+  // אי-ההבנה הזו נעשית גלויה.
+  let centre = null;
+  if(hasPoint(city)){
+    centre = [num(city.lat), num(city.lng)];
+    L.marker(centre, {
+      interactive:false, keyboard:false,
+      icon: L.divIcon({ className:'', html:'<span class="pin-city"></span>',
+                        iconSize:[18,18], iconAnchor:[9,9] })
+    }).addTo(boardMap)
+      .bindTooltip(ui('ui.map_my_city'),
+                   { permanent:true, direction:'bottom', offset:[0,8], className:'tip-muted' });
+    L.circle(centre, { radius:S.radius*1000, className:'radius-ring', interactive:false })
+      .addTo(boardMap);
+  }
+
+  state.textContent = pts.length ? '' : ui('ui.map_empty');
+  state.hidden = !!pts.length;
+
+  whenSized(holder, boardMap, () => {
+    if(pts.length === 1)    boardMap.setView(pts[0], 14);
+    else if(pts.length > 1) boardMap.fitBounds(L.latLngBounds(centre ? [...pts, centre] : pts),
+                                               { padding:[30,30], maxZoom:15 });
+    else if(centre)         boardMap.setView(centre, 12);
+    else                    boardMap.setView([31.5, 34.9], 7);
+  });
+}
+
+/* מפת סימון הסיכה בטופס העסק.
+   עיגול 50 הק״מ מציג את הגבול, הוא לא אוכף אותו: הגרירה חופשית
+   והשרת מחזיר location_far. אכיפה בלקוח הייתה כלל שני שאפשר לעקוף. */
+function wirePinMap(edit){
+  const holder = el('bizMap');
+  if(!holder) return;
+  const noCity = el('pinNoCity'), hintEl = el('pinHint'), state = el('pinState');
+  const latF = el('b_lat'), lngF = el('b_lng'), resetBtn = el('pinReset');
+  const cityVal = el('b_city_val'), cityIn = el('b_city');
+
+  let marker = null, ring = null, lastCity = null;
+  let set = !!(latF.value && lngF.value);
+
+  const cityOf = () => edit
+    ? S.cities.find(c => c.id === S.biz.city_id)
+    : S.cities.find(c => c.id === +(cityVal?.value || 0));
+
+  function paint(){
+    state.textContent = ui(set ? 'ui.pin_set' : 'ui.pin_unset');
+    if(marker) marker.setIcon(pinIcon(set));
+    if(resetBtn) resetBtn.hidden = !set;
+  }
+  function mark(ll){
+    set = true;
+    latF.value = ll.lat.toFixed(6);
+    lngF.value = ll.lng.toFixed(6);
+    marker.setLatLng(ll);
+    paint();
+  }
+  function clear(centre){
+    set = false; latF.value = ''; lngF.value = '';
+    if(marker && centre) marker.setLatLng(centre);
+    paint();
+  }
+  function pinIcon(on){
+    return window.L.divIcon({ className:'',
+      html:`<span class="pin-pick${on?' on':''}"></span>`,
+      iconSize:[22,22], iconAnchor:[11,11] });
+  }
+
+  async function sync(){
+    const c = cityOf();
+    if(!hasPoint(c)){
+      if(pickMap){ pickMap.remove(); pickMap = null; marker = null; ring = null; }
+      holder.hidden = true; hintEl.hidden = true; noCity.hidden = false;
+      lastCity = null; clear(null); state.textContent = '';
+      if(resetBtn) resetBtn.hidden = true;
+      return;
+    }
+    if(c.id === lastCity) return;             // אותה עיר — אין מה לבנות מחדש
+    const first = lastCity === null;
+    lastCity = c.id;
+    const centre = { lat:num(c.lat), lng:num(c.lng) };
+
+    noCity.hidden = true; holder.hidden = false;
+    state.textContent = ui('ui.map_loading');
+
+    let L;
+    try{
+      L = await loadLeaflet();
+    }catch(err){
+      holder.hidden = true; hintEl.hidden = true;
+      state.textContent = ui('ui.map_failed');
+      lastCity = null; return;
+    }
+    if(!el('bizMap')) return;                 // המסך התחלף בזמן הטעינה
+
+    if(!pickMap){
+      pickMap = L.map(holder, { scrollWheelZoom:false, zoomControl:false });
+      L.control.zoom({ position:'bottomleft' }).addTo(pickMap);
+      L.tileLayer(TILE_URL, { maxZoom:19, attribution:TILE_ATTR }).addTo(pickMap);
+      marker = L.marker(centre, { draggable:true, icon:pinIcon(false) }).addTo(pickMap);
+      marker.on('dragend', () => mark(marker.getLatLng()));
+      pickMap.on('click', e => mark(e.latlng));
+      ring = L.circle(centre, { radius:50000, className:'radius-ring bound',
+                                interactive:false }).addTo(pickMap);
+    } else {
+      ring.setLatLng(centre);
+    }
+
+    // סיכה קיימת נשמרת רק בטעינה הראשונה של הטופס. החלפת עיר מאפסת
+    // אותה: נקודה בעיר הקודמת היא נקודה שגויה, לא נקודה שיש לשמר.
+    const keep = first && set && latF.value && lngF.value;
+    const at   = keep ? { lat:+latF.value, lng:+lngF.value } : centre;
+    if(keep) marker.setLatLng(at); else clear(centre);
+    hintEl.hidden = false;
+    paint();
+    whenSized(holder, pickMap, () => pickMap.setView(at, keep ? 16 : 14));
+  }
+
+  if(resetBtn) resetBtn.onclick = () => {
+    const c = cityOf();
+    clear(hasPoint(c) ? { lat:num(c.lat), lng:num(c.lng) } : null);
+    if(pickMap && hasPoint(c)) pickMap.setView({ lat:num(c.lat), lng:num(c.lng) }, 14);
+  };
+
+  // wireCityFields כבר רץ וקבע onchange/onblur שפותרים שם→מזהה.
+  // addEventListener נרשם אחריו ולכן קורא את השדה הנסתר כשהוא כבר מעודכן.
+  if(cityIn){
+    for(const ev of ['input','change','blur']) cityIn.addEventListener(ev, sync);
+  }
+  sync();
+}
+
+/* ---------- מסכים: המעסיק ---------- */
+/* אותו טופס לפתיחת עסק ולעריכת פרטיו. בעריכה העיר נעולה — היא
+   קובעת את המיקום שממנו נמדד הרדיוס, ושינויה הוא עסק אחר. */
+/* בלוק סימון הסיכה. בפתיחה הוא יושב אחרי שדה העיר ולפני סוג העסק,
+   כי בלי עיר אין מרכז למפה והשרת דוחה סיכה רחוקה (location_far).
+   בעריכה אין שדה עיר — היא נעולה — ולכן הוא יושב אחרי הכתובת.
+
+   השדות הנסתרים ריקים עד שהמעסיק נוגע במפה. זה לא פרט טכני: סיכה
+   שיושבת במרכז העיר כברירת מחדל ונשלחת לשרת גורמת לו לכתוב
+   located_at, והמערכת תטען שהמיקום מדויק כשהוא איננו.
+   כפתור החזרה למרכז קיים רק בפתיחה: אי אפשר לבטל located_at בשרת,
+   וכפתור שנראה כאילו הוא מבטל הוא שקר. */
+function pinBlock(edit){
+  const b = edit ? S.biz : {};
+  const marked = edit && b.located_at && hasPoint(b);
+  return `<label>${esc(ui('ui.pin_title'))}</label>
+    <div class="note">${esc(ui('ui.pin_why'))}</div>
+    <div class="hint" id="pinNoCity">${esc(ui('ui.pin_city_first'))}</div>
+    <div id="bizMap" class="map map-pick" hidden></div>
+    <div class="note" id="pinHint" hidden>${esc(ui('ui.pin_hint'))}</div>
+    <div class="hint" id="pinState"></div>
+    ${edit ? '' : `<button type="button" class="btn ghost" id="pinReset"
+       style="margin-top:10px" hidden>${esc(ui('ui.pin_reset'))}</button>`}
+    <input type="hidden" id="b_lat" name="lat" value="${marked ? esc(num(b.lat).toFixed(6)) : ''}">
+    <input type="hidden" id="b_lng" name="lng" value="${marked ? esc(num(b.lng).toFixed(6)) : ''}">`;
+}
+
+function newBizScreen(edit){
+  const b = edit ? S.biz : {};
+  const kinds = S.termList.biz_kind || [];
+  return `${edit ? `<button class="back" id="back">${esc(ui('ui.back'))}</button>` : ''}
+  <h1>${edit ? esc(ui('ui.edit_business')) : 'העסק שלי'}</h1>
+  <div class="sub">${edit ? esc(S.biz.city)
+    : 'פותחים כרטיס עסק פעם אחת, ואחר כך מפרסמים משמרות בלחיצה.'}</div>
+  <form class="panel" id="bizForm">
+    <label for="b_name">שם העסק</label>
+    <input id="b_name" name="name" value="${esc(b.name||'')}" placeholder="לדוגמה: ביסטרו בנמל" required>
+    ${edit ? '' : `<label for="b_city">עיר</label>
+    ${cityField('b_city', null)}
+    ${pinBlock(false)}`}
+    <label for="b_kind">${esc(ui('ui.biz_kind'))}</label>
+    <select id="b_kind" name="kind">
+      ${kinds.map(k=>`<option value="${k.code}" ${k.code===(b.kind||'restaurant')?'selected':''}>${esc(k.label)}</option>`).join('')}
+    </select>
+    <label for="b_addr">כתובת</label>
+    <input id="b_addr" name="address" value="${esc(b.address||'')}" placeholder="רחוב ומספר">
+    ${edit ? pinBlock(true) : ''}
+    <label for="b_phone">${esc(ui('ui.biz_phone'))}</label>
+    <input id="b_phone" name="phone" type="tel" inputmode="numeric"
+           value="${esc(b.phone||'')}" placeholder="050-0000000">
+    <button class="btn" type="submit">${edit ? esc(ui('ui.save')) : 'פתיחת כרטיס עסק'}</button>
+    <div class="note">הכתובת מופיעה בכרטיס המשמרת של עובד ששובץ, כדי שידע לאן להגיע.
+      המשמרות והדירוגים נשמרים על שם העסק ולא על שם המנהל.</div>
+  </form>`;
+}
+
+function bizShiftCard(s){
+  const start = new Date(s.starts_at), end = new Date(s.ends_at);
+  const pend  = appsOf(s.id).filter(a => a.status === 'applied').length;
+  const free  = s.slots - s.filled;
+  const past  = end <= new Date();
+  return `<article class="card tap ${past||s.cancelled_at?'dim':''} ${s.urgent&&!past&&!s.cancelled_at?'urgent':''}" data-shift="${s.id}">
+    <div class="card-head">
+      <div>
+        <div class="role">${esc(termLabel('role', s.role_code))}</div>
+        <div class="biz">${whenLabel(start)} · ${hhmm(start)}–${hhmm(end)}</div>
+      </div>
+      <div class="pay"><span class="rate"><span class="cur">₪</span>${esc(s.rate)}</span><span class="per">לשעה</span></div>
+    </div>
+    <div class="meta">
+      ${s.cancelled_at ? `<span class="tag hot">${esc(ui('ui.shift_cancelled'))}</span>`
+        : free<=0 ? `<span class="tag done">✓ אויש ${s.filled}/${s.slots}</span>`
+                  : `<span class="tag">אויש ${s.filled} מתוך ${s.slots}</span>`}
+      ${pend && !s.cancelled_at ? `<span class="tag need">${esc(plural('ui.pending', pend))}</span>` : ''}
+      ${s.instant?'<span class="tag instant"><span class="icon icon-bolt"></span> מיידי</span>':''}
+      ${s.adults_only?`<span class="tag hot">${esc(ui('ui.adults_only'))}</span>`:''}
+      ${past?'<span class="tag">הסתיימה</span>':''}
+    </div>
+    ${postedBy(s) && !mayManage(s)
+      ? `<div class="who-sub" style="margin-top:8px">${esc(ui('ui.posted_by'))} ${esc(postedBy(s))}</div>` : ''}
+  </article>`;
+}
+
+function bizScreen(){
+  const now = new Date();
+  const up  = S.bizShifts.filter(s => new Date(s.ends_at) >  now);
+  const old = S.bizShifts.filter(s => new Date(s.ends_at) <= now).reverse();
+  const pend = up.filter(s => !s.cancelled_at)
+                 .reduce((n,s) => n + appsOf(s.id).filter(a=>a.status==='applied').length, 0);
+  const closed = !!S.biz.closed_at;
+
+  // מה תעלה סגירת העסק: משמרות עתידיות שיבוטלו ועובדים שישוחררו
+  const liveShifts = up.filter(s => !s.cancelled_at);
+  const nShifts  = liveShifts.length;
+  const nWorkers = liveShifts.reduce((n,s) => n + activeOf(s.id).length, 0);
+
+  const owner = S.bizRole === 'owner';   // עריכת פרטי העסק וסגירתו — בעלים בלבד
+  const closeBlock = closed || !owner ? '' : (S.confirmClose
+    ? `<div class="panel warn">
+         <div>${esc(ui('ui.close_confirm'))}</div>
+         <div class="meta">
+           ${nShifts  ? `<span class="tag hot">${esc(plural('ui.close_shifts',  nShifts))}</span>`  : ''}
+           ${nWorkers ? `<span class="tag hot">${esc(plural('ui.close_workers', nWorkers))}</span>` : ''}
+         </div>
+         <div class="card-foot">
+           <button class="btn danger" data-doclose="${S.biz.id}">${esc(ui('ui.close_yes'))}</button>
+           <button class="btn ghost" data-noclose="1">${esc(ui('ui.close_no'))}</button>
+         </div>
+       </div>`
+    : `<div class="card-foot" style="margin-top:26px">
+         <button class="btn ghost" data-close="${S.biz.id}">${esc(ui('ui.close_business'))}</button>
+       </div>`);
+
+  return `<h1>${esc(S.biz.name)}</h1>
+  <div class="sub">${esc(S.biz.city)}${S.biz.address?' · '+esc(S.biz.address):''}</div>
+  ${S.bizList.length > 1 ? `
+  <label for="bizPick">${esc(ui('ui.pick_business'))}</label>
+  <select id="bizPick">${S.bizList.map(b =>
+    `<option value="${b.id}" ${b.id===S.biz.id?'selected':''}>${esc(b.name)}${
+      b.closed_at ? ` · ${ui('ui.closed_tag')}` : ''}</option>`).join('')}</select>` : ''}
+  ${closed ? `<div class="err">${esc(resultText('business_closed'))}</div>`
+           : `<button class="btn" id="newShiftBtn">פרסום משמרת חדשה</button>`}
+  <div class="bar">
+    <button class="btn ghost" id="teamBtn"><span class="icon icon-users"></span> הצוות הקבוע (${S.team.length})</button>
+    ${owner && !closed ? `<button class="btn ghost" id="editBizBtn">${esc(ui('ui.edit_business'))}</button>` : ''}
+    ${pend?`<span class="tag need">${esc(plural('ui.pending_you', pend))}</span>`:''}
+  </div>
+  <h2>משמרות קרובות</h2>
+  <div class="list">${
+    up.length ? up.map(bizShiftCard).join('')
+    : `<div class="empty"><span class="big icon icon-calendar-plus"></span>אין משמרות פתוחות.<br>פרסמו משמרת והיא תופיע לעובדים בסביבה.</div>`
+  }</div>
+  ${old.length ? `<h2>הסתיימו</h2><div class="list">${old.slice(0,5).map(bizShiftCard).join('')}</div>` : ''}
+  ${closeBlock}`;
+}
+
+/* אותו טופס לפרסום ולעריכה. בעריכה העסק, העיר והמיקום אינם ניתנים
+   לשינוי — רק תנאי המשמרת עצמה. */
+function shiftFormScreen(s){
+  const roles = S.termList.role || [];
+  const dv = d => `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`;
+  const tv = d => `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const start = s ? new Date(s.starts_at) : null;
+  const end   = s ? new Date(s.ends_at)   : null;
+  const v = {
+    role:  s?.role_code || '',
+    date:  start ? dv(start) : todayStr(),
+    from:  start ? tv(start) : '18:00',
+    to:    end   ? tv(end)   : '23:00',
+    rate:  s ? Number(s.rate) : 50,
+    slots: s?.slots ?? 1,
+    dist:  s?.max_distance_km ?? '',
+    descr: s?.descr || '',
+    instant: !!s?.instant, urgent: !!s?.urgent, transport: !!s?.transport,
+    adults: !!s?.adults_only
+  };
+  const barman = (v.role || roles[0]?.code) === 'bartender';
+  const waiting = s ? appsOf(s.id).filter(a => ['applied','offered'].includes(a.status)).length : 0;
+
+  return `<button class="back" id="back">${esc(ui('ui.back'))}</button>
+  <h1>${s ? esc(ui('ui.edit_shift')) : 'פרסום משמרת'}</h1>
+  <div class="sub">${s ? 'העסק, העיר והכתובת נשארים כפי שהם.'
+                       : 'המשמרת תופיע מיד לעובדים בטווח הנסיעה מהעסק.'}</div>
+  <form class="panel" id="shiftForm">
+    <label for="s_role">תפקיד</label>
+    <select id="s_role" name="role" required>
+      ${roles.map(r=>`<option value="${r.code}" ${r.code===v.role?'selected':''}>${esc(r.label)}</option>`).join('')}
+    </select>
+    <label for="s_date">תאריך</label>
+    <input id="s_date" name="date" type="date" value="${v.date}" required>
+    <div class="two">
+      <div><label for="s_from">משעה</label>
+        <input id="s_from" name="from" type="time" value="${v.from}" required></div>
+      <div><label for="s_to">עד שעה</label>
+        <input id="s_to" name="to" type="time" value="${v.to}" required></div>
+    </div>
+    <div class="two">
+      <div><label for="s_rate">שכר לשעה (₪)</label>
+        <input id="s_rate" name="rate" type="number" inputmode="numeric" min="1" step="1" value="${v.rate}" required></div>
+      <div><label for="s_slots">כמה עובדים</label>
+        <input id="s_slots" name="slots" type="number" inputmode="numeric" min="1" max="50" value="${v.slots}" required></div>
+    </div>
+    <label for="s_dist">מרחק מרבי של העובד מהעסק</label>
+    <select id="s_dist" name="dist">
+      <option value="" ${v.dist===''?'selected':''}>ללא הגבלה</option>
+      <option value="10" ${v.dist===10?'selected':''}>עד 10 ק״מ</option>
+      <option value="20" ${v.dist===20?'selected':''}>עד 20 ק״מ</option>
+      <option value="40" ${v.dist===40?'selected':''}>עד 40 ק״מ</option>
+    </select>
+    <label for="s_descr">פרטים לעובד</label>
+    <textarea id="s_descr" name="descr" placeholder="מה צריך לדעת לפני שמגיעים">${esc(v.descr)}</textarea>
+
+    <label class="check" style="margin-top:18px">
+      <input type="checkbox" name="instant" ${v.instant?'checked':''}>
+      <span><span class="t"><span class="icon icon-bolt"></span> שיבוץ מיידי</span>
+      <span class="d">אישור מראש: הראשון שיתפוס את המשמרת משובץ מיד, בלי שתאשרו שוב.</span></span>
+    </label>
+    <label class="check">
+      <input type="checkbox" name="urgent" ${v.urgent?'checked':''}>
+      <span><span class="t">דחוף</span><span class="d">מסומן בלוח כדי למשוך תשומת לב.</span></span>
+    </label>
+    <label class="check">
+      <input type="checkbox" name="transport" ${v.transport?'checked':''}>
+      <span><span class="t"><span class="icon icon-van"></span> הסעות</span><span class="d">העסק מסיע את העובד.</span></span>
+    </label>
+    <label class="check">
+      <input type="checkbox" name="adults" id="s_adults"
+             ${v.adults||barman?'checked':''} ${barman?'disabled':''}>
+      <span><span class="t">${esc(ui('ui.adults_only_set'))}</span>
+      <span class="d" id="s_adults_note">${barman ? esc(ui('ui.adults_only_bartender')) : ''}</span></span>
+    </label>
+
+    ${waiting ? `<div class="err">${esc(plural('ui.edit_releases', waiting))}</div>` : ''}
+    <button class="btn" type="submit">${s ? esc(ui('ui.edit_save')) : 'פרסום המשמרת'}</button>
+    <div class="note">משמרת שנגמרת אחרי חצות — רשמו את שעת הסיום והמערכת תבין שמדובר ביום המחרת.</div>
+  </form>`;
+}
+
+function waLink(phone, text){
+  const d = String(phone||'').replace(/\D/g,'');
+  return `https://wa.me/${d}${text?`?text=${encodeURIComponent(text)}`:''}`;
+}
+
+// היסטוריית הגעה חוצת־מעסיקים. אי־הגעה שהעובד ערער עליה מוצגת בנפרד
+// ולעולם לא כאי־הגעה רגילה.
+function historyTags(a){
+  if(!a.shifts_done && !a.attended_yes && !a.attended_no && !a.attended_disputed)
+    return `<span class="tag">${esc(ui('ui.no_history'))}</span>`;
+  return `
+    ${a.shifts_done ? `<span class="tag">${a.shifts_done} ${esc(ui('ui.shifts_done'))}</span>` : ''}
+    ${a.attended_yes ? `<span class="tag done">✓ ${a.attended_yes} ${esc(ui('ui.attended_yes'))}</span>` : ''}
+    ${a.attended_no ? `<span class="tag hot">${a.attended_no} ${esc(ui('ui.attended_no'))}</span>` : ''}
+    ${a.attended_disputed ? `<span class="tag">${a.attended_disputed} ${esc(ui('ui.attended_disputed'))}</span>` : ''}`;
+}
+
+function applicantRow(a, s){
+  const name = a.full_name || 'עובד';
+  const live = !s.cancelled_at && new Date(s.ends_at) > new Date();
+  // הטלפון מגיע מהשרת גם ב-offered: הרעיון הוא שהשניים ידברו לפני
+  // שמישהו מאשר, ולכן כפתורי הקשר מופיעים כבר שם.
+  const contact = a.phone
+    ? `<a class="btn ghost" href="${waLink(a.phone, `שלום ${name}, מ${S.biz.name} לגבי המשמרת`)}" target="_blank" rel="noopener"><span class="icon icon-chat"></span> וואטסאפ</a>
+       <a class="btn ghost" href="tel:${esc(a.phone)}"><span class="icon icon-phone"></span> ${esc(a.phone)}</a>` : '';
+  // מועמד שהגיש בעצמו נסגר על ידי המעסיק, גם אחרי שיחה מקדימה.
+  // הצעה שהמעסיק יזם לעובד שלא הגיש — העובד הוא שסוגר אותה.
+  const employerCloses = a.initiated_by === 'worker';
+  let foot = '';
+  if(a.status === 'applied' && live){
+    foot = `<button class="btn" data-approve="${a.worker_id}">אישור השיבוץ</button>
+            <button class="btn ghost" data-talk="${a.worker_id}">${esc(ui('ui.talk_first'))}</button>
+            <button class="btn ghost" data-release="${a.worker_id}" data-as="declined">לא הפעם</button>`;
+  } else if(a.status === 'offered' && live && employerCloses){
+    foot = `${contact}
+            <button class="btn" data-approve="${a.worker_id}">אישור השיבוץ</button>
+            <button class="btn ghost" data-release="${a.worker_id}" data-as="declined">לא הפעם</button>`;
+  } else if(a.status === 'confirmed'){
+    foot = `${contact}
+            ${a.is_regular ? `<span class="who-sub">${esc(ui('ui.regular'))} ✓</span>`
+                           : `<button class="btn ghost" data-team="${a.worker_id}"><span class="icon icon-plus"></span> לצוות הקבוע</button>`}
+            ${live ? `<button class="btn danger" data-release="${a.worker_id}" data-as="cancelled">ביטול השיבוץ</button>` : ''}`;
+  } else if(a.status === 'offered' && live){
+    foot = `${contact}
+            <span class="who-sub">ההצעה נשלחה · ממתינים לאישור העובד</span>
+            <button class="btn ghost" data-release="${a.worker_id}" data-as="cancelled">ביטול ההצעה</button>`;
+  }
+  const badge = { applied:'ממתין לאישורכם', confirmed:'✓ שובץ', offered:'הוצע',
+                  declined:'נדחה', cancelled:'בוטל', withdrawn:'ביטל מועמדות' }[a.status] || '';
+  const dim = ['declined','cancelled','withdrawn'].includes(a.status);
+  return `<article class="card ${dim?'dim':''}">
+    <div class="who-row">
+      <div>
+        <div class="who-name">${esc(name)}</div>
+        <div class="who-sub">${esc(cityName(a.home_city_id))}${a.initiated_by==='business'?' · הוזמן על ידיכם':''}</div>
+      </div>
+      <span class="tag ${a.status==='confirmed'?'done':a.status==='applied'?'need':''}">${esc(badge)}</span>
+    </div>
+    <div class="meta">${historyTags(a)}</div>
+    ${a.is_adult || (a.badges||[]).length ? `<div class="meta">
+      ${a.is_adult ? `<span class="tag">${esc(ui('ui.adult_self'))}</span>` : ''}
+      ${(a.badges||[]).map(b => `<span class="tag">${esc(termLabel('badge', b))}</span>`).join('')}
+    </div><div class="note" style="margin-top:6px">${esc(ui('ui.badges_self'))}</div>` : ''}
+    ${!a.phone && !dim ? `<div class="hint">${esc(ui(
+        a.status === 'applied' ? 'ui.talk_first_hint' : 'ui.phone_after_approve'))}</div>` : ''}
+    ${foot ? `<div class="card-foot">${foot}</div>` : ''}
+  </article>`;
+}
+
+function shiftScreen(){
+  const s = S.bizShifts.find(x => x.id === S.shiftId);
+  if(!s) return `<button class="back" id="back">חזרה לעסק</button><div class="empty">המשמרת לא נמצאה.</div>`;
+  const start = new Date(s.starts_at), end = new Date(s.ends_at);
+  const apps  = appsOf(s.id);
+  const free  = s.slots - s.filled;
+  const live  = !s.cancelled_at && end > new Date();
+  const offerable = live ? S.team.filter(t => !apps.some(a =>
+      a.worker_id === t.worker_id && ['applied','offered','confirmed'].includes(a.status))) : [];
+  const nActive = activeOf(s.id).length;
+  const mine    = mayManage(s);
+  // edit_shift דוחה משמרת שכבר התחילה, גם אם טרם הסתיימה
+  const canEdit = mine && s.filled === 0 && new Date(s.starts_at) > new Date();
+
+  const cancelBlock = !live ? '' : !mine
+    ? `<div class="hint">${esc(resultText('not_yours'))}</div>`
+    : (S.confirmCancel === s.id
+    ? `<div class="panel warn">
+         <div>${esc(nActive ? plural('ui.cancel_confirm', nActive) : ui('ui.cancel_confirm_none'))}</div>
+         <label for="cancelReason">${esc(ui('ui.cancel_reason'))}</label>
+         <input id="cancelReason" maxlength="200">
+         <div class="note">${esc(ui('ui.cancel_reason_hint'))}</div>
+         <div class="card-foot">
+           <button class="btn danger" data-docancel="${s.id}">${esc(ui('ui.cancel_yes'))}</button>
+           <button class="btn ghost" data-nocancel="1">${esc(ui('ui.cancel_no'))}</button>
+         </div>
+       </div>`
+    : `<div class="card-foot">
+         ${canEdit ? `<button class="btn ghost" data-edit="${s.id}">${esc(ui('ui.edit_shift'))}</button>` : ''}
+         <button class="btn soft" data-cancel="${s.id}">${esc(ui('ui.cancel_shift'))}</button>
+       </div>
+       ${canEdit ? '' : `<div class="hint">${esc(
+           s.filled > 0 ? ui('ui.edit_locked') : resultText('started'))}</div>`}`);
+
+  return `<button class="back" id="back">חזרה לעסק</button>
+  <h1>${esc(termLabel('role', s.role_code))}</h1>
+  <div class="sub">${whenLabel(start)} · ${hhmm(start)}–${hhmm(end)} · ${hoursBetween(start,end)} שעות · ₪${esc(s.rate)} לשעה
+    ${postedBy(s) ? `<br>${esc(ui('ui.posted_by'))} ${esc(postedBy(s))}` : ''}</div>
+  <div class="meta">
+    ${s.cancelled_at ? `<span class="tag hot">${esc(ui('ui.shift_cancelled'))}</span>`
+      : free<=0 ? `<span class="tag done">✓ אויש ${s.filled}/${s.slots}</span>`
+                : `<span class="tag need">${esc(plural('ui.slots_left', free))}</span>`}
+    ${s.instant?'<span class="tag instant"><span class="icon icon-bolt"></span> שיבוץ מיידי</span>':''}
+    ${s.urgent ?'<span class="tag hot">דחוף</span>':''}
+    ${s.adults_only?`<span class="tag hot">${esc(ui('ui.adults_only'))}</span>`:''}
+    ${s.transport?'<span class="tag"><span class="icon icon-van"></span> הסעות</span>':''}
+    ${s.max_distance_km?`<span class="tag">עד ${s.max_distance_km} ק״מ</span>`:''}
+  </div>
+  ${s.descr ? `<div class="desc">${esc(s.descr)}</div>` : ''}
+  ${cancelBlock}
+
+  <h2>מועמדים</h2>
+  <div class="list">${
+    apps.length ? apps.map(a => applicantRow(a, s)).join('')
+    : `<div class="empty"><span class="big icon icon-clock"></span>עדיין אין מועמדים.<br>אפשר להציע את המשמרת לצוות הקבוע.</div>`
+  }</div>
+
+  ${offerable.length ? `<h2>הצעה לצוות הקבוע</h2>
+  <div class="list">${offerable.map(t => `<article class="card">
+    <div class="who-row">
+      <div><div class="who-name">${esc(S.people[t.worker_id]?.name || 'עובד')}</div>
+        <div class="who-sub">${esc(cityName(S.people[t.worker_id]?.cityId))}</div></div>
+      <button class="btn ghost" data-offer="${t.worker_id}">הצעת המשמרת</button>
+    </div></article>`).join('')}</div>
+  <div class="note">העובד מקבל הצעה ומאשר אותה בעצמו — כך שני הצדדים מסכימים.</div>` : ''}`;
+}
+
+function teamScreen(){
+  return `<button class="back" id="back">חזרה לעסק</button>
+  <h1>הצוות הקבוע</h1>
+  <div class="sub">עובדים שכבר עבדו אצלכם. אפשר להציע להם משמרת ישירות, לפני שהיא נפתחת לכולם.</div>
+  <div class="list">${
+    S.team.length ? S.team.map(t => {
+      const p = S.people[t.worker_id] || {};
+      return `<article class="card"><div class="who-row">
+        <div><div class="who-name">${esc(p.name || 'עובד')}</div>
+          <div class="who-sub">${esc(cityName(p.cityId))}</div></div>
+        <button class="btn ghost danger" data-unteam="${t.worker_id}">הסרה</button>
+      </div></article>`;
+    }).join('')
+    : `<div class="empty"><span class="big icon icon-users"></span>הצוות ריק.<br>אחרי שמאשרים עובד למשמרת אפשר להוסיף אותו לכאן.</div>`
+  }</div>`;
+}
+
+/* ---------- ציור ---------- */
+function render(){
+  // לפני הצבת ה-HTML: מופע Leaflet ששרד דריסה של #view הוא דליפה,
+  // והיצירה הבאה זורקת "Map container is already initialized".
+  killMaps();
+  el('who').textContent = S.user ? displayName() : '';
+  el('who').hidden      = !S.user;
+  el('outBtn').hidden   = !S.user;
+  el('tabs').hidden     = !S.user || S.screen === 'loading';
+  for(const t of document.querySelectorAll('.tab')){
+    t.classList.toggle('on', t.dataset.tab === S.tab);
+    t.setAttribute('aria-pressed', t.dataset.tab === S.tab ? 'true' : 'false');
+    t.querySelector('.lbl').textContent =
+      ui(t.dataset.tab === 'board' ? 'ui.mode_worker' : 'ui.mode_biz');
+  }
+
+  const v = el('view');
+  if(S.screen === 'loading')       v.innerHTML = `<div class="empty">טוען…</div>`;
+  else if(S.screen === 'board')    v.innerHTML = boardScreen();
+  else if(S.screen === 'profile')  v.innerHTML = profileScreen();
+  else if(S.screen === 'biz')      v.innerHTML = S.biz ? bizScreen() : newBizScreen(false);
+  else if(S.screen === 'editBiz')  v.innerHTML = newBizScreen(true);
+  else if(S.screen === 'newShift') v.innerHTML = shiftFormScreen(null);
+  else if(S.screen === 'editShift'){
+    const s = S.bizShifts.find(x => x.id === S.shiftId);
+    v.innerHTML = s ? shiftFormScreen(s)
+      : `<button class="back" id="back">${esc(ui('ui.back'))}</button><div class="empty">המשמרת לא נמצאה.</div>`;
+  }
+  else if(S.screen === 'shift')    v.innerHTML = shiftScreen();
+  else if(S.screen === 'team')     v.innerHTML = teamScreen();
+  else                             v.innerHTML = authScreen(S.screen);
+  wire();
+}
+
+function go(screen){
+  S.err=''; S.mapErr=''; S.confirmCancel=null; S.confirmClose=false; S.screen=screen;
+  if(screen==='board'||screen==='biz') S.tab=screen;
+  render();
+}
+
+/* ---------- חיווט ---------- */
+function wire(){
+  const form = el('authForm');
+  if(form){
+    form.onsubmit = onAuthSubmit;
+    el('swap').onclick = () => { S.screen = S.screen==='signup' ? 'login' : 'signup'; render(); };
+  }
+  const bizForm = el('bizForm');     if(bizForm)   bizForm.onsubmit   = onBizForm;
+  const shiftForm = el('shiftForm');
+  if(shiftForm){
+    shiftForm.onsubmit = onShiftForm;
+    // ברמן מוגש אלכוהול, ולכן 18+ נכפה בשרת. הטופס מראה את זה מיד.
+    shiftForm.role.onchange = e => {
+      const barman = e.target.value === 'bartender';
+      const box = el('s_adults');
+      if(barman) box.checked = true;
+      box.disabled = barman;
+      el('s_adults_note').textContent = barman ? ui('ui.adults_only_bartender') : '';
+    };
+  }
+  const profForm = el('profileForm');if(profForm)  profForm.onsubmit  = onProfileForm;
+  wireCityFields();
+  // אחרי wireCityFields: מפת הסיכה מאזינה לאותו שדה עיר וקוראת את
+  // השדה הנסתר אחרי שהוא כבר נפתר לשם→מזהה
+  if(el('bizMap'))   wirePinMap(S.screen === 'editBiz');
+  if(el('boardMap')) openBoardMap();
+  const back = el('back');
+  if(back) back.onclick = () => go(S.screen === 'editShift' ? 'shift'
+                                 : S.screen === 'profile'   ? 'board' : 'biz');
+  const pb = el('profileBtn');       if(pb)        pb.onclick         = () => go('profile');
+  const eb = el('editBizBtn');       if(eb)        eb.onclick         = () => go('editBiz');
+  const nb = el('newShiftBtn');      if(nb)        nb.onclick         = () => go('newShift');
+  const tb = el('teamBtn');          if(tb)        tb.onclick         = () => go('team');
+
+  const pick = el('bizPick');
+  if(pick) pick.onchange = async e => {
+    S.biz = S.bizList.find(b => b.id === e.target.value) || S.biz;
+    S.screen = 'loading'; render();
+    await loadBiz(); go('biz');
+  };
+
+  const rad = el('rad');
+  if(rad){
+    rad.oninput  = e => { S.radius = +e.target.value;
+      document.querySelector('label[for="rad"]').textContent = `רדיוס נסיעה · ${S.radius} ק״מ`; };
+    rad.onchange = async () => {
+      await sb.from('profiles').update({ search_radius_km: S.radius }).eq('id', S.user.id);
+      await loadBoard(); render();
+    };
+  }
+
+  el('view').onclick = onViewClick;
+}
+
+async function onViewClick(e){
+  const hit = sel => e.target.closest(sel);
+
+  // מתג רשימה/מפה. נבדק ראשון כי הוא לא נוגע בשרת ולא טוען כלום.
+  const vw = hit('[data-view]');
+  if(vw){
+    if(vw.dataset.view === S.view) return;
+    S.view = vw.dataset.view; saveView(S.view);
+    S.mapErr = '';
+    return render();
+  }
+
+  const claim = hit('[data-claim]'), accept = hit('[data-accept]');
+  if(claim)  return doWorker('claim_shift',  { p_shift: claim.dataset.claim  }, claim);
+  if(accept) return doWorker('accept_offer', { p_shift: accept.dataset.accept }, accept);
+
+  const open = hit('[data-shift]');
+  if(open){
+    S.shiftId = open.dataset.shift;
+    if(!S.applicants[S.shiftId]) await loadApplicants(S.shiftId);
+    return go('shift');
+  }
+
+  const approve = hit('[data-approve]');
+  if(approve) return doBiz('approve_application', { p_shift:S.shiftId, p_worker:approve.dataset.approve }, approve);
+
+  const offer = hit('[data-offer]');
+  if(offer) return doBiz('offer_shift', { p_shift:S.shiftId, p_worker:offer.dataset.offer }, offer);
+
+  // "לדבר לפני אישור" — אותה קריאה, רק שהמועמד כבר הגיש מיוזמתו
+  const talk = hit('[data-talk]');
+  if(talk) return doBiz('offer_shift', { p_shift:S.shiftId, p_worker:talk.dataset.talk }, talk);
+
+  const rel = hit('[data-release]');
+  if(rel) return doBiz('release_application',
+    { p_shift:S.shiftId, p_worker:rel.dataset.release, p_status:rel.dataset.as }, rel);
+
+  const edit = hit('[data-edit]');
+  if(edit){ S.shiftId = edit.dataset.edit; return go('editShift'); }
+
+  if(hit('[data-cancel]'))   { S.confirmCancel = hit('[data-cancel]').dataset.cancel; return render(); }
+  if(hit('[data-nocancel]')) { S.confirmCancel = null; return render(); }
+
+  const docancel = hit('[data-docancel]');
+  if(docancel){
+    docancel.disabled = true;
+    const reason = (el('cancelReason')?.value || '').trim();
+    const { data, error } = await sb.rpc('cancel_shift', {
+      p_shift: docancel.dataset.docancel,
+      p_reason: reason || null
+    });
+    if(error){ toast(friendly(error.message)); docancel.disabled = false; return; }
+    if(data.result === 'cancelled'){
+      const id = docancel.dataset.docancel;
+      toast(data.released
+        ? `${ui('ui.shift_cancelled')} · ${plural('ui.released', data.released)}`
+        : ui('ui.shift_cancelled'),
+        { label: ui('ui.undo'), run: () => undoCancel(id) });
+    } else toast(resultText(data.result));
+    S.confirmCancel = null;
+    await loadBiz();
+    if(S.shiftId) await loadApplicants(S.shiftId);
+    render(); return;
+  }
+
+  if(hit('[data-close]'))   { S.confirmClose = true;  return render(); }
+  if(hit('[data-noclose]')) { S.confirmClose = false; return render(); }
+
+  const doclose = hit('[data-doclose]');
+  if(doclose){
+    doclose.disabled = true;
+    const { data, error } = await sb.rpc('close_business', { p_business: doclose.dataset.doclose });
+    if(error){ toast(friendly(error.message)); doclose.disabled = false; return; }
+    if(data.result === 'closed'){
+      // ui.close_* מנוסחות בעתיד ומתאימות לשאלת האישור; אחרי הפעולה
+      // מדווחים בלשון עבר, והמשמרות המבוטלות ממילא נראות על המסך
+      toast(data.workers_released
+        ? `${resultText('closed')} · ${plural('ui.released', data.workers_released)}`
+        : resultText('closed'));
+    } else toast(resultText(data.result));
+    S.confirmClose = false;
+    await loadBiz(); render(); return;
+  }
+
+  const team = hit('[data-team]');
+  if(team){
+    team.disabled = true;
+    const { error } = await sb.from('team_members')
+      .insert({ business_id:S.biz.id, worker_id:team.dataset.team, added_by:S.user.id });
+    toast(error ? friendly(error.message) : 'נוסף לצוות הקבוע');
+    await loadBiz(); if(S.shiftId) await loadApplicants(S.shiftId);
+    render(); return;
+  }
+  const unteam = hit('[data-unteam]');
+  if(unteam){
+    unteam.disabled = true;
+    const { error } = await sb.from('team_members').delete()
+      .eq('business_id', S.biz.id).eq('worker_id', unteam.dataset.unteam);
+    toast(error ? friendly(error.message) : 'הוסר מהצוות');
+    await loadBiz(); render(); return;
+  }
+}
+
+/* טפסים: לא מציירים מחדש את המסך תוך כדי שליחה — מה שהמשתמש הקליד
+   נשאר לפניו גם כשהפעולה נכשלת. */
+function lockForm(form, text){
+  const b = form.querySelector('button[type=submit]');
+  b.dataset.label ||= b.textContent.trim();
+  b.disabled = true; b.textContent = text;
+  form.querySelector('.err')?.remove();
+}
+function unlockForm(form){
+  const b = form.querySelector('button[type=submit]');
+  b.disabled = false; if(b.dataset.label) b.textContent = b.dataset.label;
+}
+function formError(form, msg){
+  // אם מחרוזות הממשק לא נטענו, עדיף בלי הודעה מאשר תיבה ריקה
+  if(!msg){ form.querySelector('.err')?.remove(); return; }
+  let e = form.querySelector('.err');
+  if(!e){ e = document.createElement('div'); e.className = 'err';
+    form.querySelector('button[type=submit]').before(e); }
+  e.textContent = msg;
+}
+
+async function onAuthSubmit(ev){
+  ev.preventDefault();
+  const form = ev.target;
+  const f = new FormData(form);
+  const phone = normalizePhone(f.get('phone'));
+  const pass  = f.get('pass');
+  const isSignup = S.screen === 'signup';
+  // אותה בדיקה שהשרת אוכף. בהרשמה בלבד — חסימה בכניסה הייתה נועלת
+  // בחוץ חשבונות ישנים שנשמרו לפני שהפורמט נאכף.
+  if(!phone || (isSignup && !/^9725\d{8}$/.test(phone)))
+    return formError(form, resultText('bad_phone'));
+  if(isSignup && !f.get('city')) return formError(form, resultText('city_not_found'));
+  lockForm(form, 'רגע…');
+  try{
+    if(isSignup){
+      const { data, error } = await sb.auth.signUp({
+        email: phoneToEmail(phone),
+        password: pass,
+        options:{ data:{
+          full_name: (f.get('name')||'').trim(),
+          phone: '+' + phone,
+          home_city_id: f.get('city'),
+          lang: 'he', country_code: 'IL'
+        }}
+      });
+      if(error) throw error;
+      // חשבון נוצר בלי מושב פתוח — קורה כשהחשבון ממתין לאישור.
+      // בלי ההודעה הזו המשתמש נשאר מול טופס ריק ולא מבין מה קרה.
+      if(!data.session){
+        unlockForm(form);
+        formError(form, 'החשבון נוצר, אבל עדיין אי אפשר להיכנס איתו. פנו אלינו לאישור החשבון.');
+        return;
+      }
+    } else {
+      const { error } = await sb.auth.signInWithPassword({
+        email: phoneToEmail(phone), password: pass
+      });
+      if(error) throw error;
+    }
+  }catch(err){
+    unlockForm(form);
+    formError(form, friendly(err.message));
+  }
+}
+
+/* פתיחת כרטיס עסק. קריאה אחת: היא יוצרת גם את העסק וגם את הבעלות,
+   כדי שלא ייווצר עסק בלי בעלים אם השנייה נכשלת. */
+async function onBizForm(ev){
+  ev.preventDefault();
+  const form = ev.target;
+  const f = new FormData(form);
+  const edit = S.screen === 'editBiz';
+  const phone = (f.get('phone')||'').trim();
+  if(!edit && !f.get('city')) return formError(form, resultText('city_not_found'));
+
+  /* שולחים את שתי הקואורדינטות או אף אחת. חצי נקודה מחזירה
+     bad_location. השדות ריקים כל עוד המעסיק לא נגע במפה, ואז לא
+     נשלחת נקודה כלל — השרת נופל למרכז העיר ומשאיר located_at ריק.
+     שליחת מרכז העיר כסיכה הייתה גורמת למערכת להבטיח דיוק שאינו קיים. */
+  const lat = f.get('lat'), lng = f.get('lng');
+  const pin = (lat && lng) ? { p_lat:+lat, p_lng:+lng } : {};
+
+  lockForm(form, 'רגע…');
+  try{
+    const { data, error } = edit
+      ? await sb.rpc('update_business', {
+          p_business: S.biz.id,
+          p_name:     (f.get('name')||'').trim(),
+          p_address:  (f.get('address')||'').trim(),
+          p_phone:    phone ? '+' + normalizePhone(phone) : null,
+          p_kind:     f.get('kind'),
+          ...pin
+        })
+      : await sb.rpc('create_business', {
+          p_name:    (f.get('name')||'').trim(),
+          p_city_id: +f.get('city'),
+          p_address: (f.get('address')||'').trim(),
+          p_phone:   phone ? '+' + normalizePhone(phone) : null,
+          p_kind:    f.get('kind'),
+          ...pin
+        });
+    if(error) throw error;
+    const okCode = edit ? 'saved' : 'created';
+    if(data.result !== okCode){
+      unlockForm(form); formError(form, resultText(data.result)); return;
+    }
+    await loadBiz();
+    /* מעסיק שהזיז סיכה הזיז גם משמרות שכבר פורסמו, וצריך לדעת את זה.
+       מחובר להודעה אחת ולא לטוסט שני: הטוסט יחיד, וקריאה שנייה
+       הייתה מוחקת את הראשונה לפני שנקראה. אותה תבנית כמו בביטול משמרת. */
+    toast(data.shifts_moved
+      ? `${resultText(okCode)} · ${plural('ui.pin_moved_shifts', data.shifts_moved)}`
+      : resultText(okCode));
+    go('biz');
+  }catch(err){
+    unlockForm(form);
+    formError(form, friendly(err.message));
+  }
+}
+
+/* השלמת פרטי העובד. תאריך לידה נשמר פעם אחת בלבד, ולכן כשהוא כבר
+   קיים השדה מושבת ולא נשלח בכלל. */
+async function onProfileForm(ev){
+  ev.preventDefault();
+  const form = ev.target;
+  const f = new FormData(form);
+  if(!f.get('city')) return formError(form, resultText('city_not_found'));
+  lockForm(form, 'רגע…');
+  try{
+    const { data, error } = await sb.rpc('complete_worker_profile', {
+      p_given:    (f.get('given')||'').trim(),
+      p_family:   (f.get('family')||'').trim(),
+      p_city_id:  +f.get('city'),
+      p_birth_date: f.get('birth') || null
+    });
+    if(error) throw error;
+    if(data.result !== 'saved'){
+      unlockForm(form); formError(form, resultText(data.result)); return;
+    }
+    await loadProfile();
+    await loadBoard();
+    toast(resultText('saved'));
+    go('board');
+  }catch(err){
+    unlockForm(form);
+    formError(form, friendly(err.message));
+  }
+}
+
+/* פרסום או עריכה. שם העסק, העיר, המיקום ואזור הזמן נלקחים מכרטיס
+   העסק בשרת — הלקוח שולח רק את מה שהמעסיק באמת מילא. */
+async function onShiftForm(ev){
+  ev.preventDefault();
+  const form = ev.target;
+  const f = new FormData(form);
+  const editing = S.screen === 'editShift';
+  const current = editing ? S.bizShifts.find(x => x.id === S.shiftId) : null;
+  if(editing && !current) return;
+
+  const date = f.get('date'), from = f.get('from'), to = f.get('to');
+  const starts = localISO(date, from, false);
+  let   ends   = localISO(date, to, false);
+  if(ends <= starts) ends = localISO(date, to, true);   // משמרת שעוברת חצות
+
+  const args = {
+    p_role_code: f.get('role'),
+    p_starts:    starts,
+    p_ends:      ends,
+    p_rate:      +f.get('rate'),
+    p_slots:     +f.get('slots'),
+    p_instant:   f.get('instant')   === 'on',
+    p_urgent:    f.get('urgent')    === 'on',
+    p_transport: f.get('transport') === 'on',
+    p_descr:     (f.get('descr')||'').trim(),
+    p_max_distance_km: f.get('dist') ? +f.get('dist') : null,
+    // תיבה מושבתת אינה נשלחת בטופס, ולכן ברמן נקבע מפורשות
+    p_adults_only: f.get('adults') === 'on' || f.get('role') === 'bartender'
+  };
+  if(editing){
+    args.p_shift = S.shiftId;
+    args.p_exp_code = current.exp_code || 'none';   // לא נערך בממשק, ולא נאפס בטעות
+  } else {
+    args.p_business = S.biz.id;
+  }
+
+  lockForm(form, editing ? 'רגע…' : 'מפרסם…');
+  try{
+    const { data, error } = await sb.rpc(editing ? 'edit_shift' : 'post_shift', args);
+    if(error) throw error;
+    const okCode = editing ? 'edited' : 'posted';
+    if(data.result !== okCode){
+      unlockForm(form); formError(form, resultText(data.result)); return;
+    }
+    if(!editing) S.shiftId = data.id;
+    await loadBiz();
+    await loadApplicants(S.shiftId);
+    toast(resultText(okCode));
+    go('shift');
+  }catch(err){
+    unlockForm(form);
+    formError(form, friendly(err.message));
+  }
+}
+
+// שגיאות רשת ותשתית — מה שלא מגיע כקוד תוצאה מהשרת.
+function friendly(msg){
+  const m = String(msg||'');
+  if(/already registered/i.test(m))       return 'הטלפון הזה כבר רשום. נסו להיכנס.';
+  if(/Invalid login/i.test(m))            return 'טלפון או סיסמה שגויים.';
+  if(/not confirmed/i.test(m))            return 'החשבון עדיין ממתין לאישור. פנו אלינו כדי להפעיל אותו.';
+  if(/at least 6/i.test(m))               return 'הסיסמה חייבת להיות באורך 6 תווים לפחות.';
+  if(/row-level security|violates row|permission denied/i.test(m))
+                                          return resultText('forbidden');
+  if(/duplicate key/i.test(m))            return 'הרשומה כבר קיימת.';
+  if(/Failed to fetch|NetworkError/i.test(m)) return 'אין חיבור לשרת. בדקו את האינטרנט ונסו שוב.';
+  return ui('ui.unknown_result');
+}
+
+/* חזרה מביטול משמרת. השרת פותח חלון של שתי דקות ומחזיר את
+   השיבוצים למצבם הקודם — הלקוח לא משחזר כלום בעצמו. */
+async function undoCancel(shiftId){
+  const { data, error } = await sb.rpc('uncancel_shift', { p_shift: shiftId });
+  if(error) return toast(friendly(error.message));
+  toast(data.result === 'uncancelled' && data.restored
+    ? `${resultText('uncancelled')} · ${plural('ui.restored', data.restored)}`
+    : resultText(data.result));
+  await loadBiz();
+  if(S.shiftId) await loadApplicants(S.shiftId);
+  render();
+}
+
+async function doWorker(fn, args, btn){
+  btn.disabled = true;
+  const { data, error } = await sb.rpc(fn, args);
+  if(error){ toast(friendly(error.message)); btn.disabled = false; return; }
+  toast(resultText(data));
+  // סירוב שנובע מפרופיל חסר — שולחים אותו למסך שפותר את זה
+  if(data === 'need_birth_date' || data === 'no_city'){ go('profile'); return; }
+  await loadBoard(); render();
+}
+
+async function doBiz(fn, args, btn){
+  if(!S.shiftId) return;
+  btn.disabled = true;
+  const { data, error } = await sb.rpc(fn, args);
+  if(error){ toast(friendly(error.message)); btn.disabled = false; return; }
+  S.confirmCancel = null;          // פעולה אחרת סוגרת שאלת ביטול פתוחה
+  toast(resultText(data, 'biz'));
+  await loadBiz();
+  await loadApplicants(S.shiftId);
+  render();
+}
+
+el('outBtn').onclick = async () => { await sb.auth.signOut(); };
+// השם בכותרת הוא הדרך היחידה לחזור לפרטים אחרי שהושלמו
+el('who').onclick = () => { if(S.user) go('profile'); };
+for(const t of document.querySelectorAll('.tab'))
+  t.onclick = () => go(t.dataset.tab);
+
+/* ---------- אתחול ---------- */
+async function boot(session){
+  if(!session){
+    S.user = null; S.profile = null; S.biz = null; S.bizList = [];
+    if(S.screen !== 'signup') S.screen = 'login';
+    render(); return;
+  }
+  S.user = session.user;
+  S.screen = 'loading'; render();
+  await loadProfile();
+  await Promise.all([loadBoard(), loadBiz()]);
+  S.screen = S.tab = 'board';
+  render();
+}
+
+await loadReference();
+const { data:{ session } } = await sb.auth.getSession();
+await boot(session);
+// רק כניסה או יציאה בונים את המסך מחדש. רענון טוקן מתרחש ברקע
+// כל שעה, ואסור לו להקפיץ את הלוח חזרה למסך טעינה.
+sb.auth.onAuthStateChange((event, s) => {
+  if(event === 'SIGNED_IN' && S.user?.id === s?.user?.id) return;
+  if(event === 'SIGNED_IN' || event === 'SIGNED_OUT') boot(s);
+});
+</script>
+</body>
+</html>
