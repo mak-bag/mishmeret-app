@@ -152,6 +152,11 @@ jobs:
           for s in extensions auth private supabase_migrations; do
             P -qc "create schema if not exists $s;"
           done
+          # **תמונת postgis/postgis מגיעה עם postgis מותקן ב-public** (וגם
+          # topology/tiger שתלויים בו). "if not exists" דילג, ו-geography
+          # נשאר ב-public בזמן שהדאמפ מבקש extensions.geography — כך נפל
+          # התרגיל בריצה #10. מסירים ומתקינים במקום הנכון. (28/09)
+          P -qc "drop extension if exists postgis cascade;"
           for e in postgis pgcrypto '"uuid-ossp"'; do
             P -qc "create extension if not exists $e with schema extensions;"
           done
