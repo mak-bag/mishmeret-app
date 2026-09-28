@@ -75,10 +75,23 @@ jobs:
             echo "Use the Session pooler URI from Dashboard > Connect." >&2
             exit 1
           fi
+          # הפולר מזהה את הפרויקט דרך שם המשתמש: postgres.<ref>. בלי הסיומת
+          # הוא עונה "password authentication failed" — שבעה לילות אדומים
+          # (22–28/09) בגלל זה. נכשלים כאן עם הודעה שאומרת מה לתקן. (DevOps)
+          if echo "$DB_URL" | grep -qE '://postgres(:|@)'; then
+            echo "Pooler URI needs user postgres.<project-ref>, not bare postgres." >&2
+            exit 1
+          fi
           echo "STAMP=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
+          # **נתיב מלא ל-17.** ה-runner מגיע עם Postgres 16 מותקן, ו-pg_dump
+          # שב-PATH הוא ה-wrapper שבוחר ב-16 — "server version mismatch".
+          # התקנת client-17 לבדה לא מספיקה. (28/09)
+          PGBIN=/usr/lib/postgresql/17/bin
+          echo "PGBIN=$PGBIN" >> "$GITHUB_ENV"
+          "$PGBIN/pg_dump" --version
           # בלי --no-privileges במכוון: כל מודל ההרשאות של הפרויקט הוא
           # GRANT-ים, ודאמפ בלעדיהם משחזר מסד שהאפליקציה לא עובדת מולו.
-          pg_dump "$DB_URL" --format=custom --no-owner -f dump.pgc
+          "$PGBIN/pg_dump" "$DB_URL" --format=custom --no-owner -f dump.pgc
           ls -lh dump.pgc
 
       - name: Encrypt
@@ -96,6 +109,17 @@ jobs:
           shred -u dump.pgc
           ls -lh "mishmeret-$STAMP.pgc.gpg"
 
+      # **הגיבוי נשמר לפני התרגיל, לא אחריו.** בסדר הקודם, תרגיל שנכשל
+      # השאיר לילה בלי שום עותק — גם כשהדאמפ עצמו היה תקין. תרגיל אדום
+      # עדיין צובע את הריצה באדום, אבל הקובץ כבר בידינו. (28/09)
+      - name: Store encrypted backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: mishmeret-db-${{ env.STAMP }}
+          path: mishmeret-${{ env.STAMP }}.pgc.gpg
+          retention-days: 90
+          if-no-files-found: error
+
       # מכאן והלאה עובדים על הקובץ המוצפן בלבד — בדיוק מה שנשמר.
       - name: Restore drill
         env:
@@ -106,18 +130,34 @@ jobs:
           gpg --batch --yes --quiet --decrypt \
               --passphrase "$PASSPHRASE" \
               -o drill.pgc "mishmeret-$STAMP.pgc.gpg"
+          P() { "$PGBIN/psql" -h localhost -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 "$@"; }
 
-          # תפקידי Supabase אינם קיימים במסד נקי, וה-GRANT-ים בדאמפ
-          # מפנים אליהם. יוצרים אותם כדי שהשחזור ייבדק באמת ולא "יעבור"
-          # בזכות דילוג על שגיאות.
-          for r in anon authenticated service_role authenticator \
-                   supabase_auth_admin supabase_storage_admin supabase_admin; do
-            psql -h localhost -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 \
-                 -c "do \$\$ begin if not exists (select 1 from pg_roles where rolname='$r') then create role $r; end if; end \$\$;"
+          # תפקידים: לא רשימה קבועה — כל תפקיד שהדאמפ מעניק לו או מגדיר
+          # עליו מדיניות. רשימה ידנית נשברת בפעם הראשונה ש-Supabase מוסיפה
+          # תפקיד, ו--exit-on-error היה מפיל את התרגיל על GRANT.
+          ROLES=$("$PGBIN/pg_restore" -f - drill.pgc \
+                  | grep -oE '\b(TO|FROM) "?[a-z_][a-z0-9_]*"?' | awk '{gsub(/"/,"",$2); print $2}' \
+                  | grep -vE '^(public|postgres|pg_[a-z_]+)$' | sort -u)
+          for r in $ROLES; do
+            P -qc "do \$\$ begin if not exists (select 1 from pg_roles where rolname='$r') then create role \"$r\"; end if; end \$\$;"
+          done
+          echo "roles created: $(echo $ROLES | wc -w)"
+
+          # מה שהסכימה שלנו נשענת עליו ואינו בה: geography (postgis),
+          # gen_random_uuid/crypt (pgcrypto), uuid-ossp — כולן ב-extensions,
+          # כמו בפרודקשן. auth ו-private נכנסים לשחזור: FK ל-auth.users,
+          # auth.uid() במדיניות, ו-private.* בכל RPC ובכל מדיניות.
+          # pg_restore --schema=X משחזר את מה שבתוך X, לא את CREATE SCHEMA X
+          # עצמו (ל-SCHEMA אין namespace ב-TOC). לכן יוצרים אותן מראש.
+          for s in extensions auth private supabase_migrations; do
+            P -qc "create schema if not exists $s;"
+          done
+          for e in postgis pgcrypto '"uuid-ossp"'; do
+            P -qc "create extension if not exists $e with schema extensions;"
           done
 
-          pg_restore --exit-on-error --no-owner \
-            --schema=public --schema=supabase_migrations \
+          "$PGBIN/pg_restore" --exit-on-error --no-owner \
+            --schema=auth --schema=private --schema=public --schema=supabase_migrations \
             -h localhost -p 5433 -U postgres -d postgres drill.pgc
           shred -u drill.pgc
 
@@ -126,7 +166,7 @@ jobs:
           PGPASSWORD: drill
         run: |
           set -euo pipefail
-          q() { psql -h localhost -p 5433 -U postgres -d postgres -tAc "$1"; }
+          q() { "$PGBIN/psql" -h localhost -p 5433 -U postgres -d postgres -tAc "$1"; }
 
           MIGRATIONS=$(q "select count(*) from supabase_migrations.schema_migrations;")
           HEAD=$(q "select max(version) from supabase_migrations.schema_migrations;")
@@ -141,14 +181,6 @@ jobs:
           [ "$MIGRATIONS" -gt 0 ]  || { echo "no migration history restored" >&2; exit 1; }
           [ "$TABLES"     -ge 12 ] || { echo "expected >=12 public tables, got $TABLES" >&2; exit 1; }
           [ "$NONZERO"    -ge 6  ] || { echo "expected >=6 non-empty tables, got $NONZERO" >&2; exit 1; }
-
-      - name: Store encrypted backup
-        uses: actions/upload-artifact@v4
-        with:
-          name: mishmeret-db-${{ env.STAMP }}
-          path: mishmeret-${{ env.STAMP }}.pgc.gpg
-          retention-days: 90
-          if-no-files-found: error
 
       # עותק מחוץ ל-GitHub. ארטיפקט ב-GitHub נופל יחד עם חשבון GitHub —
       # זה מה שמגן מפני השתלטות על החשבון, ולא מפני מחיקה בלבד.
@@ -172,7 +204,10 @@ jobs:
             --only-show-errors
           echo "R2_STATE=uploaded" >> "$GITHUB_ENV"
 
+      # רץ גם כשהתרגיל נכשל — כדי שהלוג יגיד "יש קובץ, התרגיל אדום"
+      # ולא ישתוק. ורק אם יש קובץ מוצפן לתעד.
       - name: Record run
+        if: always() && hashFiles('mishmeret-*.pgc.gpg') != ''
         run: |
           set -euo pipefail
           mkdir -p backups
