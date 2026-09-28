@@ -157,6 +157,9 @@ jobs:
           # נשאר ב-public בזמן שהדאמפ מבקש extensions.geography — כך נפל
           # התרגיל בריצה #10. מסירים ומתקינים במקום הנכון. (28/09)
           P -qc "drop extension if exists postgis cascade;"
+          # הדאמפ מוסיף טבלאות לפרסום realtime של Supabase (ALTER PUBLICATION
+          # supabase_realtime ADD TABLE ...). במסד נקי אין אותו — ריצה #11.
+          P -qc "do \$\$ begin if not exists (select 1 from pg_publication where pubname='supabase_realtime') then create publication supabase_realtime; end if; end \$\$;"
           for e in postgis pgcrypto '"uuid-ossp"'; do
             P -qc "create extension if not exists $e with schema extensions;"
           done
