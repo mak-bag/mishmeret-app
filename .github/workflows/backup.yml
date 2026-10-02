@@ -120,6 +120,31 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
+      # עותק מחוץ ל-GitHub. ארטיפקט ב-GitHub נופל יחד עם חשבון GitHub —
+      # זה מה שמגן מפני השתלטות על החשבון, ולא מפני מחיקה בלבד.
+      # מדלג בשקט כל עוד R2 לא הופעל (N9), ואינו מפיל את הגיבוי בגללו.
+      # **רץ לפני התרגיל**, מאותו נימוק שהקדים את הארטיפקט: תרגיל אדום לא
+      # אמור למנוע את העותק שמחוץ ל-GitHub — והוא דווקא זה שמגן מפני
+      # השתלטות על החשבון, להבדיל ממחיקה. (DevOps, 01/10)
+      - name: Copy to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${R2_ACCOUNT_ID:-}" ]; then
+            echo "R2 secrets absent - skipping off-provider copy (see N9)."
+            echo "R2_STATE=skipped" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          aws s3 cp "mishmeret-$STAMP.pgc.gpg" \
+            "s3://mishmeret-backups/mishmeret-$STAMP.pgc.gpg" \
+            --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" \
+            --only-show-errors
+          echo "R2_STATE=uploaded" >> "$GITHUB_ENV"
+
       # מכאן והלאה עובדים על הקובץ המוצפן בלבד — בדיוק מה שנשמר.
       - name: Restore drill
         env:
@@ -180,37 +205,20 @@ jobs:
           HEAD=$(q "select max(version) from supabase_migrations.schema_migrations;")
           TABLES=$(q "select count(*) from pg_tables where schemaname='public';")
           NONZERO=$(q "select count(*) from (select 1 from pg_tables t where t.schemaname='public' and (xpath('/row/c/text()', query_to_xml(format('select count(*) c from public.%I', t.tablename), false, true, '')))[1]::text::int > 0) s;")
+          AUTH_USERS=$(q "select count(*) from auth.users;" 2>/dev/null || echo 0)
 
-          echo "migrations=$MIGRATIONS head=$HEAD tables=$TABLES nonzero=$NONZERO"
-          echo "DRILL_LINE=migrations=$MIGRATIONS head=$HEAD tables=$TABLES nonzero=$NONZERO" >> "$GITHUB_ENV"
+          echo "migrations=$MIGRATIONS head=$HEAD tables=$TABLES nonzero=$NONZERO auth_users=$AUTH_USERS"
+          echo "DRILL_LINE=migrations=$MIGRATIONS head=$HEAD tables=$TABLES nonzero=$NONZERO auth_users=$AUTH_USERS" >> "$GITHUB_ENV"
 
           # שחזור שמחזיר סכימה ריקה "מצליח" טכנית. אלה התנאים שהופכים
           # את התרגיל לבדיקה במקום לטקס.
           [ "$MIGRATIONS" -gt 0 ]  || { echo "no migration history restored" >&2; exit 1; }
           [ "$TABLES"     -ge 12 ] || { echo "expected >=12 public tables, got $TABLES" >&2; exit 1; }
           [ "$NONZERO"    -ge 6  ] || { echo "expected >=6 non-empty tables, got $NONZERO" >&2; exit 1; }
-
-      # עותק מחוץ ל-GitHub. ארטיפקט ב-GitHub נופל יחד עם חשבון GitHub —
-      # זה מה שמגן מפני השתלטות על החשבון, ולא מפני מחיקה בלבד.
-      # מדלג בשקט כל עוד R2 לא הופעל (N9), ואינו מפיל את הגיבוי בגללו.
-      - name: Copy to Cloudflare R2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: auto
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${R2_ACCOUNT_ID:-}" ]; then
-            echo "R2 secrets absent - skipping off-provider copy (see N9)."
-            echo "R2_STATE=skipped" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          aws s3 cp "mishmeret-$STAMP.pgc.gpg" \
-            "s3://mishmeret-backups/mishmeret-$STAMP.pgc.gpg" \
-            --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" \
-            --only-show-errors
-          echo "R2_STATE=uploaded" >> "$GITHUB_ENV"
+          # הדאמפ כולל את auth, אבל עד כה שום טענה לא בדקה אותה: שחזור שבו
+          # auth.users חוזרת ריקה היה עובר בירוק — כל הנתונים חוזרים ואיש לא
+          # מתחבר, כי ההתחברות היא הטלפון הממופה לכתובת סינתטית שם. (DevOps)
+          [ "$AUTH_USERS" -ge 1 ] || { echo "no auth.users restored - nobody could log in" >&2; exit 1; }
 
       # רץ גם כשהתרגיל נכשל — כדי שהלוג יגיד "יש קובץ, התרגיל אדום"
       # ולא ישתוק. ורק אם יש קובץ מוצפן לתעד.
