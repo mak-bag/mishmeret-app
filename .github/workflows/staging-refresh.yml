@@ -114,9 +114,10 @@ jobs:
           S "drop schema if exists private cascade;"
           S "drop schema if exists supabase_migrations cascade;"
           S "drop schema if exists public cascade;"
-          S "create schema public;"
-          # ההרשאות שסופבייס נותנת ל-public בפרויקט חדש, ושנמחקו עם הסכימה.
-          S "grant usage on schema public to postgres, anon, authenticated, service_role;"
+          # **לא יוצרים כאן את public.** pg_dump עם --schema=public פולט
+          # CREATE SCHEMA public בעצמו, ושתי היצירות התנגשו בריצה #1:
+          # ‎psql:schema.sql:33: ERROR: schema "public" already exists.
+          # הדאמפ יוצר אותה, ומביא איתה את ההרשאות שלה מהפרודקשן.
           # ההרחבות חייבות לשבת ב-extensions, כמו בפרודקשן. בלי זה
           # extensions.geography לא יימצא — הכשל שהפיל את התרגיל ב-28/09.
           for e in postgis pgcrypto '"uuid-ossp"'; do
@@ -130,6 +131,11 @@ jobs:
         run: |
           set -euo pipefail
           "$PGBIN/psql" "$STAGING_URL" -v ON_ERROR_STOP=1 -f schema.sql
+          # רשת ביטחון, אידמפוטנטית: אם הדאמפ לא נשא את הרשאות הסכימה,
+          # anon ו-authenticated היו מאבדים גישה ו-staging היה "עובד"
+          # אחרת מהפרודקשן בלי שאיש ישים לב.
+          "$PGBIN/psql" "$STAGING_URL" -v ON_ERROR_STOP=1 \
+            -qc "grant usage on schema public to postgres, anon, authenticated, service_role;"
 
       - name: Identity checks - staging that fails these is lying
         env:
@@ -150,8 +156,14 @@ jobs:
           QUAL=$(q "select coalesce(qual,'(none)') from pg_policies
                     where schemaname='public' and tablename='profiles' and policyname='profiles_read';")
 
+          ANONUSE=$(q "select has_schema_privilege('anon','public','usage');")
+          AUTHUSE=$(q "select has_schema_privilege('authenticated','public','usage');")
+
           echo "anon_fns=$ANON tables=$TABLES private_fns=$PRIVFNS send_details_full=$FULL"
+          echo "schema_usage anon=$ANONUSE authenticated=$AUTHUSE"
           echo "profiles_read=$QUAL"
+
+          [ "$ANONUSE" = "t" ] && [ "$AUTHUSE" = "t" ] || { echo "usage on schema public did not survive the rebuild" >&2; exit 1; }
 
           # הערכים נמדדו בפרודקשן ב-03/10. שינוי מכוון בפרודקשן ⇒ לעדכן כאן.
           [ "$ANON"    = "0" ]  || { echo "anon can execute functions - the privilege floor did not come across" >&2; exit 1; }
