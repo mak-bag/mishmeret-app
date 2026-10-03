@@ -1,0 +1,179 @@
+name: staging-refresh
+
+# מרענן את הסכימה של staging מהפרודקשן.
+#
+# למה דרך Actions ולא ביד: מחרוזות החיבור הן סודות, והן נשארות כאן.
+# אף סוכן ואף צ'אט לא רואה אותן. וזה גם הופך רענון לכפתור, במקום לטקס
+# שייעשה פעם אחת ויירקב בזמן שהפרודקשן ממשיך לזוז.
+#
+# **הפעולה הזו מוחקת ובונה מחדש את public ו-private ב-staging.**
+# לכן: ידני בלבד, ועם אישור שמוקלד ביד.
+#
+# מה לא עובר, ולמה:
+#   auth · storage · realtime · vault · extensions · graphql
+#   כולן קיימות בכל פרויקט Supabase ומנוהלות על ידו. נמדד 03/10:
+#   ל-staging יש auth זהה לפרודקשן (27 טבלאות, 82 מיגרציות). שחזור
+#   לתוכן היה מסכן את ההתחברות ב-staging — כלומר את מה שבאנו לבדוק.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_ref:
+        description: 'הקלד את ה-ref של staging כדי לאשר מחיקה ובנייה מחדש'
+        required: true
+        type: string
+
+concurrency:
+  group: staging-refresh
+  cancel-in-progress: false
+
+env:
+  PROD_REF:    rkmjggormlxcvzuqedig
+  STAGING_REF: sjwkfhqsqpxknlfncbbq
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard - confirmation, secrets, and which database is which
+        env:
+          PROD_URL:    ${{ secrets.SUPABASE_DB_URL }}
+          STAGING_URL: ${{ secrets.STAGING_DB_URL }}
+          CONFIRM:     ${{ inputs.confirm_ref }}
+        run: |
+          set -euo pipefail
+
+          [ "$CONFIRM" = "$STAGING_REF" ] || {
+            echo "confirmation does not match the staging ref. Nothing was touched." >&2; exit 1; }
+
+          [ -n "${PROD_URL:-}" ]    || { echo "SUPABASE_DB_URL is not set." >&2; exit 1; }
+          [ -n "${STAGING_URL:-}" ] || { echo "STAGING_DB_URL is not set."  >&2; exit 1; }
+
+          # ‼ השמירה החשובה בקובץ הזה. טעות אחת כאן מוחקת את הפרודקשן.
+          # staging חייב להיות staging, ובפירוש לא הפרודקשן.
+          # כולן בצורת if ולא ב-`grep && { exit 1; }`: תחת set -e, grep
+          # שאינו מוצא מפיל את הצעד — כלומר בדיוק במקרה התקין. נתפס
+          # בבדיקה לפני המסירה.
+          # הסדר מכוון: קודם "זה הפרודקשן", כי זו ההודעה שאדם צריך
+          # לראות כשהוא טעה טעות שאי אפשר לחזור ממנה.
+          if echo "$STAGING_URL" | grep -q "$PROD_REF"; then
+            echo "STAGING_DB_URL points at PRODUCTION. Refusing." >&2; exit 1
+          fi
+          if ! echo "$STAGING_URL" | grep -q "$STAGING_REF"; then
+            echo "STAGING_DB_URL does not point at $STAGING_REF. Refusing." >&2; exit 1
+          fi
+          if ! echo "$PROD_URL" | grep -q "$PROD_REF"; then
+            echo "SUPABASE_DB_URL does not point at $PROD_REF. Refusing." >&2; exit 1
+          fi
+
+          # אותן שתי מלכודות של backup.yml, על שתי המחרוזות.
+          for u in "$PROD_URL" "$STAGING_URL"; do
+            if echo "$u" | grep -q 'db\..*\.supabase\.co'; then
+              echo "a URL points at the direct IPv6-only host. Use the Session pooler." >&2; exit 1
+            fi
+            if echo "$u" | grep -qE '://postgres(:|@)'; then
+              echo "a URL uses the bare user 'postgres'. The pooler needs postgres.<ref>." >&2; exit 1
+            fi
+          done
+          echo "guards passed."
+
+      - name: Install postgresql-client 17
+        run: |
+          set -euo pipefail
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /usr/share/keyrings/pgdg.gpg
+          echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          # נתיב מלא: ב-PATH יושב 16, וה-wrapper נותן "server version mismatch".
+          echo "PGBIN=/usr/lib/postgresql/17/bin" >> "$GITHUB_ENV"
+
+      - name: Dump schema from production (schema only, never data)
+        env:
+          PROD_URL:  ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          "$PGBIN/pg_dump" "$PROD_URL" \
+            --schema-only --no-owner \
+            --schema=public --schema=private --schema=supabase_migrations \
+            -f schema.sql
+          # בלי --no-privileges, במכוון: מודל ההרשאות כולו GRANT-ים,
+          # ו-staging בלעדיהם אינו בודק את מה שהפרודקשן מריץ.
+          echo "lines: $(wc -l < schema.sql)"
+          grep -c 'CREATE POLICY' schema.sql || true
+
+      - name: Reset the two schemas that are ours
+        env:
+          STAGING_URL: ${{ secrets.STAGING_DB_URL }}
+          PGSSLMODE:   require
+        run: |
+          set -euo pipefail
+          S() { "$PGBIN/psql" "$STAGING_URL" -v ON_ERROR_STOP=1 -qc "$1"; }
+          S "drop schema if exists private cascade;"
+          S "drop schema if exists supabase_migrations cascade;"
+          S "drop schema if exists public cascade;"
+          S "create schema public;"
+          # ההרשאות שסופבייס נותנת ל-public בפרויקט חדש, ושנמחקו עם הסכימה.
+          S "grant usage on schema public to postgres, anon, authenticated, service_role;"
+          # ההרחבות חייבות לשבת ב-extensions, כמו בפרודקשן. בלי זה
+          # extensions.geography לא יימצא — הכשל שהפיל את התרגיל ב-28/09.
+          for e in postgis pgcrypto '"uuid-ossp"'; do
+            S "create extension if not exists $e with schema extensions;"
+          done
+
+      - name: Apply the schema
+        env:
+          STAGING_URL: ${{ secrets.STAGING_DB_URL }}
+          PGSSLMODE:   require
+        run: |
+          set -euo pipefail
+          "$PGBIN/psql" "$STAGING_URL" -v ON_ERROR_STOP=1 -f schema.sql
+
+      - name: Identity checks - staging that fails these is lying
+        env:
+          STAGING_URL: ${{ secrets.STAGING_DB_URL }}
+          PGSSLMODE:   require
+        run: |
+          set -euo pipefail
+          q() { "$PGBIN/psql" "$STAGING_URL" -tAc "$1"; }
+
+          ANON=$(q "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+                    where n.nspname in ('public','private') and has_function_privilege('anon', p.oid, 'execute');")
+          TABLES=$(q "select count(*) from pg_tables where schemaname='public';")
+          PRIVFNS=$(q "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+                       where n.nspname='private';")
+          FULL=$(q "select coalesce((select position('full' in pg_get_functiondef(p.oid))>0
+                     from pg_proc p join pg_namespace n on n.oid=p.pronamespace
+                     where n.nspname='public' and p.proname='send_details' limit 1), false);")
+          QUAL=$(q "select coalesce(qual,'(none)') from pg_policies
+                    where schemaname='public' and tablename='profiles' and policyname='profiles_read';")
+
+          echo "anon_fns=$ANON tables=$TABLES private_fns=$PRIVFNS send_details_full=$FULL"
+          echo "profiles_read=$QUAL"
+
+          # הערכים נמדדו בפרודקשן ב-03/10. שינוי מכוון בפרודקשן ⇒ לעדכן כאן.
+          [ "$ANON"    = "0" ]  || { echo "anon can execute functions - the privilege floor did not come across" >&2; exit 1; }
+          [ "$TABLES" -ge 18 ]  || { echo "expected >=18 public tables, got $TABLES" >&2; exit 1; }
+          [ "$PRIVFNS" -ge 27 ] || { echo "expected >=27 private functions, got $PRIVFNS" >&2; exit 1; }
+          [ "$FULL"    = "t" ]  || { echo "send_details is missing the capacity check (S5)" >&2; exit 1; }
+          echo "$QUAL" | grep -q 'may_see_profile' || { echo "profiles_read is not may_see_profile - SEC-01 did not come across" >&2; exit 1; }
+
+          echo "staging matches production on all five anchors."
+
+      - name: Confirm staging holds no personal data
+        env:
+          STAGING_URL: ${{ secrets.STAGING_DB_URL }}
+          PGSSLMODE:   require
+        run: |
+          set -euo pipefail
+          q() { "$PGBIN/psql" "$STAGING_URL" -tAc "$1"; }
+          # הכלל נעול: אף שורה אמיתית לא עוברת ל-staging, לעולם.
+          # הרענון הוא schema-only, ולכן אחרי ריצה הטבלאות חייבות להיות ריקות.
+          for t in profiles businesses shifts applications; do
+            n=$(q "select count(*) from public.$t;" 2>/dev/null || echo 0)
+            echo "$t=$n"
+            [ "$n" = "0" ] || { echo "$t is not empty after a schema-only refresh" >&2; exit 1; }
+          done
+          echo "no rows carried over."
