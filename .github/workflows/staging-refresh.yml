@@ -130,7 +130,23 @@ jobs:
           PGSSLMODE:   require
         run: |
           set -euo pipefail
-          "$PGBIN/psql" "$STAGING_URL" -v ON_ERROR_STOP=1 -f schema.sql
+          # ריצה #2 (03/10, Tech Lead): הדאמפ נושא שורות ברירת מחדל של הפלטפורמה
+          # (FOR ROLE supabase_admin / supabase_auth_admin). postgres לא רשאי לשנות
+          # אותן — 42501 "permission denied to change default privileges" — והריצה
+          # נפלה בסוף החלה שאר הסכימה כבר נכנסה. הן לא שלנו ולכן לא עוברות.
+          grep -v -E '^ALTER DEFAULT PRIVILEGES FOR ROLE (supabase_admin|supabase_auth_admin) ' schema.sql > schema.apply.sql
+          echo "platform default-privilege lines skipped: $(( $(wc -l < schema.sql) - $(wc -l < schema.apply.sql) ))"
+          "$PGBIN/psql" "$STAGING_URL" -v ON_ERROR_STOP=1 -f schema.apply.sql
+          # השורה הגלובלית של postgres (בלי IN SCHEMA) לא נכללת ב-pg_dump --schema,
+          # ובלעדיה מלכודת 2 פתוחה ב-staging: כל פונקציה חדשה ניתנת להרצה ל-anon.
+          # בדיוק כמו בפרודקשן (SEC-01).
+          "$PGBIN/psql" "$STAGING_URL" -v ON_ERROR_STOP=1 \
+            -qc "alter default privileges revoke execute on functions from public;"
+          "$PGBIN/psql" "$STAGING_URL" -v ON_ERROR_STOP=1 \
+            -qc "alter default privileges in schema public revoke execute on functions from anon;"
+          # בפרודקשן השורה של public היא {postgres=X, authenticated=X, service_role=X}.
+          "$PGBIN/psql" "$STAGING_URL" -v ON_ERROR_STOP=1 \
+            -qc "alter default privileges in schema public grant execute on functions to authenticated, service_role;"
           # רשת ביטחון, אידמפוטנטית: אם הדאמפ לא נשא את הרשאות הסכימה,
           # anon ו-authenticated היו מאבדים גישה ו-staging היה "עובד"
           # אחרת מהפרודקשן בלי שאיש ישים לב.
@@ -172,7 +188,20 @@ jobs:
           [ "$FULL"    = "t" ]  || { echo "send_details is missing the capacity check (S5)" >&2; exit 1; }
           echo "$QUAL" | grep -q 'may_see_profile' || { echo "profiles_read is not may_see_profile - SEC-01 did not come across" >&2; exit 1; }
 
-          echo "staging matches production on all five anchors."
+          # עוגן שביעי: פונקציה *חדשה* לא פתוחה ל-anon. ספירה של הקיימות (ANON) לא
+          # תופסת את זה — הן כולן עם revoke מפורש. נוצרת ומבוטלת באותה טרנזקציה.
+          PROBE=$("$PGBIN/psql" "$STAGING_URL" -qtA -v ON_ERROR_STOP=1 <<'SQL'
+          begin;
+          create function public._probe_defacl() returns int language sql as 'select 1';
+          select has_function_privilege('anon','public._probe_defacl()','execute')::text
+              || ',' || has_function_privilege('authenticated','public._probe_defacl()','execute')::text;
+          rollback;
+          SQL
+          )
+          echo "new_function anon,authenticated=$PROBE"
+          [ "$PROBE" = "false,true" ] || { echo "new-function defaults differ from production (expected anon=false, authenticated=true) - trap 2" >&2; exit 1; }
+
+          echo "staging matches production on all seven anchors."
 
       - name: Confirm staging holds no personal data
         env:
