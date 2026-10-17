@@ -87,7 +87,11 @@ jobs:
           fi
           echo "server-suite: 0 FAIL"
 
+      # e2e plants its own three users, so it is an independent signal - it runs even when
+      # the suite above fails (the suite still reads fixtures from existing data; on staging
+      # those may be missing - open task for the server lane: plant them like e2e does).
       - name: Full path (ops/tests/e2e-path-staging.sql) - H15
+        if: always()
         env:
           STAGING_URL: ${{ secrets.STAGING_DB_URL }}
           PGSSLMODE:   require
