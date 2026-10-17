@@ -71,7 +71,8 @@ jobs:
           #   const STAGING = /^mishmeret-staging(-[a-z0-9]+)?\./.test(location.hostname);
           # לכן: שולפים את הביטוי מהעמוד, ומוודאים שהמארח של הפרודקשן
           # *אינו* מתאים לו. אם מישהו ירחיב אותו יום אחד יותר מדי — נדע.
-          RX=$(grep -oE 'const STAGING *= */[^/]+/' page.html | head -1 | sed -E 's#.*/(.*)/#\1#')
+          # beta-5.1 has no switch: grep finds nothing and exits 1, which under pipefail killed the step (run #1).
+          RX=$( { grep -oE 'const STAGING *= */[^/]+/' page.html || true; } | head -1 | sed -E 's#.*/(.*)/#\1#')
           HOST=$(echo "$SITE" | sed -E 's#^https?://##; s#/.*##')
           if [ -n "$RX" ]; then
             echo "switch: /$RX/   host: $HOST"
