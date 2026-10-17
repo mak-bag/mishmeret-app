@@ -1,0 +1,43 @@
+# =============================================================================
+# משמרת — כותרות אבטחה (Cloudflare Workers static assets)
+# הקובץ יושב באותה תיקייה כמו index.html. Cloudflare לא מגיש אותו —
+# הוא קורא אותו ומוסיף את הכותרות לכל תגובה.
+#
+# CSP מתחיל ב-Report-Only: שום דבר לא נחסם, הדפדפן רק מדווח בקונסול.
+# אחרי כמה ימים בלי הפרות (כולל פתיחת מפה, תמונות, התחברות) —
+# מחליפים את שם הכותרת ל-Content-Security-Policy (בלי -Report-Only).
+#
+# חשוב: ה-hashes ב-script-src הם טביעת אצבע של 4 ה-<script> הפנימיים
+# ב-index.html. כל שינוי בהם = לחשב מחדש (scripts/csp-hashes.ps1 — אין
+# python במכונה; הסקריפט ב-.py מעולם לא נכתב).
+#
+# ‼ upgrade-insecure-requests הוסר 16/10 — ולא כי הוא מיותר.
+#   בכותרת Report-Only התקן מורה לדפדפן **להתעלם** ממנו, ולכן הוא רק
+#   הדפיס אזהרה בכל טעינה בלי להגן על דבר.
+#   **הוא חייב לחזור באותו שינוי שמוריד את ה--Report-Only.** שם הוא
+#   כן פועל, ובלעדיו נאבד אותו בשקט בדיוק ברגע שהוא מתחיל להועיל.
+#
+# ‼ img-src ו-connect-src מכילים **שני** פרויקטים, וזה איחוד מכוון
+#   (הכרעת Tech Lead, 16/10):
+#   אותו zip בדיוק עולה ל-staging ולפרודקשן — זו הערובה המרכזית של
+#   הצינור, ולכן המדיניות חייבת להיות האיחוד של שתי הסביבות.
+#   • בפרודקשן זה מתיר חיבור למקור שהיא לעולם אינה פונה אליו.
+#     ההגנה האמיתית היא script-src: בלי הרצת סקריפט אין מי שינצל זאת.
+#     ושמירת H8 ב-monitor.yml מוכיחה בכל לילה לאיזה מסד הלקוח פונה.
+#   • ב-enforcing זו **חובה**: בלי השורות האלה כל קריאת API ב-staging
+#     תיחסם, ו-staging יפסיק לשמש כבדיקה.
+#   אם staging יבוטל יום אחד — להסיר את שתי ההפניות ל-sjwkfhqs… כאן.
+# =============================================================================
+
+/*
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(self), camera=(self), microphone=(), payment=(), usb=(), interest-cohort=()
+  Cross-Origin-Opener-Policy: same-origin
+  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' https://cdn.jsdelivr.net 'wasm-unsafe-eval' 'sha256-dmDDKOgO55lyiISVw4z7w+l3QvCPjjsdWSmivyBYXEo=' 'sha256-AgLRXUL/2FAWRGbv2pwxMZw2rW1cXWRXfg1aK1kQO4w=' 'sha256-xGkv3/8JDFzY98jAlReL7zCRla7ZvSMKyKoiSlQ5fyU=' 'sha256-yKrY7SgKswZ6OQ5VmRSXac+6FoQDaJzJwvf/QWGlkIY=' ; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://rkmjggormlxcvzuqedig.supabase.co https://sjwkfhqsqpxknlfncbbq.supabase.co https://tiles.openfreemap.org; connect-src 'self' https://rkmjggormlxcvzuqedig.supabase.co wss://rkmjggormlxcvzuqedig.supabase.co https://sjwkfhqsqpxknlfncbbq.supabase.co wss://sjwkfhqsqpxknlfncbbq.supabase.co https://tiles.openfreemap.org https://cdn.jsdelivr.net; worker-src 'self' blob:; child-src blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+
+# נכסים סטטיים (לוגו, אייקונים) — שם הקובץ לא משתנה, לכן יום אחד ולא שנה
+/assets/*
+  Cache-Control: public, max-age=86400

@@ -1,0 +1,130 @@
+name: monitor
+
+# ניטור המוצר החי. H10.
+#
+# למה הוא קיים: בין ~06/10 ל-11/10 האתר החי היה בלי אף תפקיד — terms עברה
+# 1000 שורות ו-PostgREST חתך בדיוק את אוצר המילים. חמישה ימים, ואיש לא ידע.
+# הגיבוי נבדק כל לילה; המוצר לא נבדק אף פעם. זה מתקן את זה.
+#
+# **הוא לא משתמש בשום סוד.** המפתח הציבורי נשלף מהעמוד החי עצמו, ולכן
+# הניטור בודק בדיוק את המסלול שהדפדפן של המשתמש עובר — ולא מסלול מקביל
+# שעלול להתיישן בשקט.
+
+on:
+  schedule:
+    - cron: '0 2 * * *'     # 05:00 שעון ישראל, אחרי הגיבוי
+  workflow_dispatch:
+
+concurrency:
+  group: monitor
+  cancel-in-progress: false
+
+env:
+  SITE:      https://round-field-973f.op-6bf.workers.dev
+  PROD_REF:  rkmjggormlxcvzuqedig
+  TERMS_CAP: 990            # אותו מספר כמו ה-guard במסד (v1_terms_cap_guard)
+  ROLES_MIN: 20             # היום 24. נופל הרבה לפני שהמשתמש רואה רשימה ריקה
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. the page itself
+        run: |
+          set -euo pipefail
+          code=$(curl -s -o page.html -w '%{http_code}' -m 30 "$SITE/")
+          size=$(wc -c < page.html)
+          echo "status=$code bytes=$size"
+          [ "$code" = "200" ] || { echo "site is not serving 200" >&2; exit 1; }
+          # הגודל נבדק כטווח ולא כמספר: שחרור משנה אותו, קריסה לאפס לא.
+          [ "$size" -gt 150000 ] || { echo "page is far too small ($size) - broken deploy" >&2; exit 1; }
+          grep -q '<title>' page.html || { echo "no <title> - not our page" >&2; exit 1; }
+
+      - name: 2. security headers are actually served
+        run: |
+          set -euo pipefail
+          curl -s -D h.txt -o /dev/null -m 30 "$SITE/"
+          # שמות הכותרות ב-HTTP אינם תלויי רישיות.
+          if ! grep -qi '^content-security-policy' h.txt; then
+            echo "no CSP header served - _headers is not reaching Cloudflare" >&2; exit 1
+          fi
+          grep -qi '^strict-transport-security' h.txt || { echo "no HSTS" >&2; exit 1; }
+          grep -qi '^x-content-type-options'    h.txt || { echo "no X-Content-Type-Options" >&2; exit 1; }
+          echo "CSP: $(grep -i '^content-security-policy' h.txt | cut -c1-60)…"
+
+      - name: 3. the client's own credentials, taken from the live page
+        run: |
+          set -euo pipefail
+          # לא מקודדים כאן כתובת ומפתח: שולפים את מה שהעמוד באמת משתמש בו.
+          # כך שינוי בלקוח לא משאיר את הניטור בודק יעד ישן.
+          URL="https://$PROD_REF.supabase.co"
+          KEY=$(grep -oE "(sb_publishable_[A-Za-z0-9_-]+|eyJ[A-Za-z0-9_.-]{40,})" page.html | head -1)
+          [ -n "$KEY" ] || { echo "could not find the publishable key in the page" >&2; exit 1; }
+          grep -q "$PROD_REF" page.html || { echo "the production ref is not in the page at all" >&2; exit 1; }
+
+          # --- H8, ונבדק על המנגנון ולא על טקסט ---
+          # הגרסה הראשונה שלי לקחה את ה-URL הראשון בעמוד. זו הייתה בדיקה
+          # חסרת ערך: שורות 1470–1471 מחזיקות את כתובת הפרודקשן הקשיחה
+          # (היא נשארה בשביל הרתמה), ולכן היא נמצאת ראשונה *גם בבילד של
+          # staging*. הבדיקה הייתה מחזירה ירוק לנצח.
+          # מה שבאמת קובע לאיזה מסד הלקוח פונה הוא תנאי אחד:
+          #   const STAGING = /^mishmeret-staging(-[a-z0-9]+)?\./.test(location.hostname);
+          # לכן: שולפים את הביטוי מהעמוד, ומוודאים שהמארח של הפרודקשן
+          # *אינו* מתאים לו. אם מישהו ירחיב אותו יום אחד יותר מדי — נדע.
+          RX=$(grep -oE 'const STAGING *= */[^/]+/' page.html | head -1 | sed -E 's#.*/(.*)/#\1#')
+          HOST=$(echo "$SITE" | sed -E 's#^https?://##; s#/.*##')
+          if [ -n "$RX" ]; then
+            echo "switch: /$RX/   host: $HOST"
+            if echo "$HOST" | grep -qE "$RX"; then
+              echo "‼ the production host matches the STAGING switch - production would talk to staging (H8)" >&2
+              exit 1
+            fi
+          else
+            # beta-5.1 קודם למתג והוא קשיח לפרודקשן. זה תקין — אבל אז
+            # חייב להתקיים שאין בעמוד שום הפניה ל-staging.
+            echo "no STAGING switch in this build (pre-switch client) - checking it is hardcoded instead"
+            if grep -q 'sjwkfhqsqpxknlfncbbq' page.html; then
+              echo "‼ a pre-switch build must not mention the staging ref at all" >&2; exit 1
+            fi
+          fi
+          echo "URL=$URL" >> "$GITHUB_ENV"
+          echo "KEY=$KEY" >> "$GITHUB_ENV"
+          echo "api: $URL (key not printed)"
+
+      - name: 4. the vocabulary the user actually sees
+        run: |
+          set -euo pipefail
+          # Range + count=exact מחזיר "Content-Range: 0-0/<total>" בלי להוריד שורות.
+          total() {
+            curl -s -D - -o /dev/null -m 30 \
+              -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+              -H 'Range: 0-0' -H 'Prefer: count=exact' \
+              "$URL/rest/v1/terms?select=code${1:-}" \
+            | grep -i '^content-range' | tr -d '\r' | sed 's#.*/##'
+          }
+          ROLES=$(total '&kind=eq.role')
+          ALL=$(total '')
+          echo "roles=$ROLES  terms_total=$ALL  cap=$TERMS_CAP"
+
+          # זו הבדיקה שהייתה תופסת את ההשבתה של 06/10.
+          [ -n "$ROLES" ] && [ "$ROLES" -ge "$ROLES_MIN" ] || {
+            echo "‼ only $ROLES roles visible - the job list is empty for every worker" >&2; exit 1; }
+
+          # והיא גם מתריעה לפני, לא רק אחרי.
+          [ -n "$ALL" ] && [ "$ALL" -lt "$TERMS_CAP" ] || {
+            echo "‼ terms is at $ALL, at or past the $TERMS_CAP guard - seeding is blocked and the ceiling is near" >&2; exit 1; }
+
+          HEAD=$(( TERMS_CAP - ALL ))
+          echo "headroom: $HEAD rows before the guard refuses new strings"
+          [ "$HEAD" -ge 20 ] || echo "::warning::only $HEAD rows of headroom left in public.terms"
+
+      - name: 5. one real read through the client's own path
+        run: |
+          set -euo pipefail
+          # terms לבדה לא מוכיחה שהמסד חי למשתמש. קריאה אחת שעוברת RLS כאנונימי.
+          code=$(curl -s -o /dev/null -w '%{http_code}' -m 30 \
+            -H "apikey: $KEY" -H "Authorization: Bearer $KEY" \
+            "$URL/rest/v1/cities?select=id&limit=1")
+          echo "cities read: $code"
+          [ "$code" = "200" ] || { echo "anonymous read failed ($code) - RLS or key problem" >&2; exit 1; }
+          echo "live product looks healthy."

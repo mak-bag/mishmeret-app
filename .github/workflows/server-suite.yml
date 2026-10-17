@@ -1,0 +1,137 @@
+name: server-suite
+
+# סוויטת השרת + המסלול המלא. H9 + H15.
+#
+# **מול staging בלבד.** T22/T23 ו-e2e מוחקות משתמשים, והבטיחות נשענת על
+# RAISE בשורה האחרונה שמגלגל את הטרנזקציה אחורה. בג'וב לילי שאיש לא
+# משגיח עליו זה לא מקובל מול פרודקשן — ולכן היעד נבדק כאן ונדחה אם הוא
+# אינו staging.
+#
+# **ה-exit code של psql אינו הסימן.** ריצה מוצלחת *תמיד* נגמרת בשגיאה,
+# כי זה מנגנון הגלגול אחורה. מה שנבדק הוא הטקסט:
+#   server-suite : הסימן 'SUITE'            + "_summary" עם 0 FAIL
+#   e2e          : הסימן 'E2E (rolled back)' + אף מפתח שנגמר ב-_ERROR
+#
+# ‼ והחשוב מכולם: **היעדר הסימן הוא הכשל החמור.** אם ה-RAISE לא קרה,
+#   ה-DO block הסתיים כרגיל — כלומר נשמר. המחיקות הפכו אמיתיות.
+
+on:
+  schedule:
+    - cron: '30 2 * * *'     # אחרי monitor, 05:30 שעון ישראל
+  workflow_dispatch:
+
+concurrency:
+  group: server-suite
+  cancel-in-progress: false
+
+env:
+  STAGING_REF: sjwkfhqsqpxknlfncbbq
+  PROD_REF:    rkmjggormlxcvzuqedig
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Guard - staging only, and never production
+        env:
+          STAGING_URL: ${{ secrets.STAGING_DB_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "${STAGING_URL:-}" ] || { echo "STAGING_DB_URL is not set." >&2; exit 1; }
+          if echo "$STAGING_URL" | grep -q "$PROD_REF"; then
+            echo "‼ STAGING_DB_URL points at PRODUCTION. This suite deletes users. Refusing." >&2; exit 1
+          fi
+          if ! echo "$STAGING_URL" | grep -q "$STAGING_REF"; then
+            echo "STAGING_DB_URL does not point at $STAGING_REF. Refusing." >&2; exit 1
+          fi
+          if echo "$STAGING_URL" | grep -q 'db\..*\.supabase\.co'; then
+            echo "direct IPv6-only host. Use the Session pooler." >&2; exit 1
+          fi
+          if echo "$STAGING_URL" | grep -qE '://postgres(:|@)'; then
+            echo "bare user 'postgres'. The pooler needs postgres.<ref>." >&2; exit 1
+          fi
+          echo "target confirmed: $STAGING_REF"
+
+      - name: Install postgresql-client 17
+        run: |
+          set -euo pipefail
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /usr/share/keyrings/pgdg.gpg
+          echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          echo "PGBIN=/usr/lib/postgresql/17/bin" >> "$GITHUB_ENV"
+
+      - name: Server suite (ops/tests/server-suite.sql)
+        env:
+          STAGING_URL: ${{ secrets.STAGING_DB_URL }}
+          PGSSLMODE:   require
+        run: |
+          set -uo pipefail          # לא -e: psql חייב לצאת שונה מאפס כדי להצליח
+          "$PGBIN/psql" "$STAGING_URL" -v ON_ERROR_STOP=1 \
+            -f ops/tests/server-suite.sql > out.txt 2>&1 || true
+          sed -n '1,400p' out.txt
+
+          if ! grep -q 'SUITE' out.txt; then
+            echo "::error::the suite did not reach its final RAISE - the transaction was NOT rolled back" >&2
+            exit 1
+          fi
+          SUM=$(grep -oE '"_summary"[^,}]*' out.txt | head -1)
+          echo "summary: $SUM"
+          [ -n "$SUM" ] || { echo "::error::no _summary in the output" >&2; exit 1; }
+          if ! echo "$SUM" | grep -qE '[^0-9]0 FAIL'; then
+            echo "::error::the suite reported failures: $SUM" >&2; exit 1
+          fi
+          echo "server-suite: 0 FAIL"
+
+      - name: Full path (ops/tests/e2e-path-staging.sql) - H15
+        env:
+          STAGING_URL: ${{ secrets.STAGING_DB_URL }}
+          PGSSLMODE:   require
+        run: |
+          set -uo pipefail
+          "$PGBIN/psql" "$STAGING_URL" -v ON_ERROR_STOP=1 \
+            -f ops/tests/e2e-path-staging.sql > e2e.txt 2>&1 || true
+          sed -n '1,400p' e2e.txt
+
+          if ! grep -q 'E2E (rolled back)' e2e.txt; then
+            echo "::error::the path did not reach its final RAISE - the transaction was NOT rolled back" >&2
+            exit 1
+          fi
+          # כל כשל בדרך מוסיף מפתח שנגמר ב-_ERROR. אין כאלה = המסלול עבר.
+          if grep -oE '"[A-Za-z0-9_]+_ERROR"' e2e.txt | sort -u | grep .; then
+            echo "::error::the full path failed at the steps listed above" >&2; exit 1
+          fi
+          echo "e2e path: no step errors"
+
+      # ליין השרת עובד לפי "עבר נאמר רק על פלט שחזר לתיקייה"
+      # (docs/backend/README.md - בריפו התיעוד). לוג של Actions נמחק ואי אפשר לצטט ממנו,
+      # ולכן הפלט הגולמי נשמר כארטיפקט — מורידים ומדביקים כמו שהוא
+      # ל-docs/backend/results/NNN-*.staging.md.
+      - name: Keep the raw output for docs/backend/results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: suite-output-${{ github.run_number }}
+          path: |
+            out.txt
+            e2e.txt
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Staging still holds no real data
+        if: always()
+        env:
+          STAGING_URL: ${{ secrets.STAGING_DB_URL }}
+          PGSSLMODE:   require
+        run: |
+          set -euo pipefail
+          # רשת אחרונה: אם ה-RAISE לא קרה והמחיקות נשמרו, או אם מישהו
+          # זרע נתונים אמיתיים ל-staging בטעות — רואים את זה כאן.
+          "$PGBIN/psql" "$STAGING_URL" -tAc \
+            "select 'users='||(select count(*) from auth.users)
+                 ||' businesses='||(select count(*) from public.businesses)
+                 ||' shifts='||(select count(*) from public.shifts);"
